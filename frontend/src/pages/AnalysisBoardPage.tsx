@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Chess } from 'chess.js';
+import { Link } from '@tanstack/react-router';
 import {
+  ArrowLeft,
   Bot,
   Check,
   ChevronFirst,
@@ -15,6 +17,7 @@ import {
 } from 'lucide-react';
 import { ARROW_COLORS, ChessBoard, type BoardArrow } from '../components/ChessBoard';
 import { CoachPanel } from '../components/CoachPanel';
+import { PageHeader } from '../components/PageHeader';
 import { playMove, sideToMove, type BoardMove } from '../lib/chessRules';
 import { useCoachMarks } from '../lib/coachMarks';
 import {
@@ -137,7 +140,23 @@ function moveNumber(fen: string): number {
 
 type PlayState = { color: PieceColor; level: number };
 
-export function AnalysisBoardPage({ initialFen }: { initialFen?: string }) {
+/** "game:<id>:<ply>" from the review page's "Open in analysis". */
+function parseFrom(from: string | undefined): { gameId: string; ply: number } | null {
+  const match = /^game:([^:]+):(\d+)$/.exec(from ?? '');
+  return match ? { gameId: match[1], ply: Number(match[2]) } : null;
+}
+
+export function AnalysisBoardPage({
+  initialFen,
+  from,
+  focus
+}: {
+  initialFen?: string;
+  from?: string;
+  /** Scroll to and open a panel on arrival: the opening explorer or the coach. */
+  focus?: 'explorer' | 'coach';
+}) {
+  const origin = parseFrom(from);
   const startFen = initialFen && !validateFen(initialFen) ? initialFen.trim() : START_FEN;
   const [tree, setTree] = useState(() => newTree(startFen));
   const [currentId, setCurrentId] = useState(ROOT);
@@ -161,6 +180,15 @@ export function AnalysisBoardPage({ initialFen }: { initialFen?: string }) {
   const coachMarks = useCoachMarks(fen);
   const treeRef = useRef(tree);
   treeRef.current = tree;
+
+  useEffect(() => {
+    if (!focus) return;
+    // Wait a frame: the router restores scroll to the top after the page mounts.
+    const id = window.setTimeout(() => {
+      document.getElementById(focus === 'coach' ? 'analysis-coach' : 'analysis-explorer')?.scrollIntoView({ block: 'start' });
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [focus]);
 
   const playBoardMove = useCallback((parentId: string, move: BoardMove, fenAfter: string) => {
     const result = addMove(treeRef.current, parentId, move, fenAfter);
@@ -313,13 +341,22 @@ export function AnalysisBoardPage({ initialFen }: { initialFen?: string }) {
 
   return (
     <main className="route-page analysis-page">
-      <header className="page-header">
-        <div>
-          <span className="page-eyebrow">Analysis board</span>
-          <h1>Explore any position</h1>
-          <p>Try your own ideas, see Stockfish's top lines, and ask the coach why they work.</p>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Analysis board"
+        title="Explore any position"
+        detail="Try your own ideas, see Stockfish's top lines, and ask the coach why they work."
+        actions={origin ? (
+          <Link
+            className="secondary"
+            to="/games/$gameId"
+            params={{ gameId: origin.gameId }}
+            search={{ moment: undefined }}
+            state={{ reviewPly: origin.ply }}
+          >
+            <ArrowLeft size={16} /> Back to game
+          </Link>
+        ) : undefined}
+      />
 
       <section className="analysis-workspace">
         <div className="analysis-board-column">
@@ -411,7 +448,11 @@ export function AnalysisBoardPage({ initialFen }: { initialFen?: string }) {
             </section>
           )}
 
-          {!play && <OpeningExplorer fen={fen} onPlayMove={playSan} />}
+          {!play && (
+            <div id="analysis-explorer" className="analysis-anchor">
+              <OpeningExplorer fen={fen} onPlayMove={playSan} />
+            </div>
+          )}
 
           <section className="analysis-card analysis-moves" aria-label="Moves">
             <h2>Moves</h2>
@@ -421,6 +462,15 @@ export function AnalysisBoardPage({ initialFen }: { initialFen?: string }) {
               <p className="analysis-hint">Make a move on the board to start a line.</p>
             )}
           </section>
+
+          <div id="analysis-coach" className="analysis-anchor">
+            <CoachPanel
+              fen={fen}
+              autoFocus={focus === 'coach'}
+              onAnnotations={coachMarks.onAnnotations}
+              suggestions={['Explain this position', 'What is the plan for the side to move?', 'Why is the engine move best?']}
+            />
+          </div>
 
           {!play && (
             <section className="analysis-card analysis-play-setup" aria-label="Play against the computer">
@@ -480,11 +530,6 @@ export function AnalysisBoardPage({ initialFen }: { initialFen?: string }) {
         </div>
       </section>
 
-      <CoachPanel
-        fen={fen}
-        onAnnotations={coachMarks.onAnnotations}
-        suggestions={['Explain this position', 'What is the plan for the side to move?', 'Why is the engine move best?']}
-      />
     </main>
   );
 }

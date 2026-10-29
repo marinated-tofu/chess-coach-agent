@@ -1,21 +1,10 @@
 import {
-  Link,
   Outlet,
   createRootRoute,
   createRoute,
   createRouter,
   redirect
 } from '@tanstack/react-router';
-import {
-  Activity,
-  Library,
-  Lightbulb,
-  Home,
-  Microscope,
-  Swords,
-  Target,
-  TrendingUp
-} from 'lucide-react';
 import { MonitoringDashboard } from './components/MonitoringDashboard';
 import { useWorkspace } from './workspace/WorkspaceContext';
 import { GamesPage } from './pages/GamesPage';
@@ -26,55 +15,19 @@ import { PracticePage } from './pages/PracticePage';
 import { GameReviewPage } from './pages/GameReviewPage';
 import { AnalysisBoardPage } from './pages/AnalysisBoardPage';
 import { SetupPositionPage } from './pages/SetupPositionPage';
-import { ScanLine } from 'lucide-react';
 import { PlayPage } from './pages/PlayPage';
 import { RepertoirePage } from './pages/RepertoirePage';
-import { BookMarked } from 'lucide-react';
 import { PageHeader } from './components/PageHeader';
-import { AccountButton } from './components/AccountButton';
+import { AppNav } from './components/AppNav';
+import { SyncToast } from './components/SyncToast';
 
 function AppShell() {
-  const { analyses } = useWorkspace();
   return (
     <div className="app-frame">
-      <aside className="app-sidebar">
-        <Link className="brand" to="/">
-          <Activity size={19} />
-          <span>Chess Coach</span>
-        </Link>
-        <nav aria-label="Primary navigation">
-          <Link to="/" activeProps={{ className: 'active' }} activeOptions={{ exact: true }}>
-            <Home size={18} /><span>Home</span>
-          </Link>
-          <Link to="/games" search={{ import: false }} activeProps={{ className: 'active' }}>
-            <Library size={18} /><span>Games</span>
-            {analyses.length > 0 && <small>{analyses.length}</small>}
-          </Link>
-          <Link to="/practice" activeProps={{ className: 'active' }}>
-            <Target size={18} /><span>Practice</span>
-          </Link>
-          <Link to="/progress" activeProps={{ className: 'active' }}>
-            <TrendingUp size={18} /><span>Progress</span>
-          </Link>
-          <Link to="/insights" activeProps={{ className: 'active' }}>
-            <Lightbulb size={18} /><span>Insights</span>
-          </Link>
-          <Link to="/analysis" search={{ fen: undefined }} activeProps={{ className: 'active' }}>
-            <Microscope size={18} /><span>Analysis</span>
-          </Link>
-          <Link to="/setup" activeProps={{ className: 'active' }}>
-            <ScanLine size={18} /><span>Set up position</span>
-          </Link>
-          <Link to="/play" search={{ fen: undefined }} activeProps={{ className: 'active' }}>
-            <Swords size={18} /><span>Play</span>
-          </Link>
-          <Link to="/repertoire" activeProps={{ className: 'active' }}>
-            <BookMarked size={18} /><span>Repertoire</span>
-          </Link>
-        </nav>
-        <AccountButton />
-      </aside>
-      <div className="app-content"><Outlet /></div>
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      <AppNav />
+      <div className="app-content" id="main-content" tabIndex={-1}><Outlet /></div>
+      <SyncToast />
     </div>
   );
 }
@@ -122,7 +75,10 @@ const analyzeRoute = createRoute({
 const gamesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/games',
-  validateSearch: (search: Record<string, unknown>) => ({ import: search.import === true }),
+  validateSearch: (search: Record<string, unknown>): { import: boolean; theme?: string } => ({
+    import: search.import === true,
+    ...(typeof search.theme === 'string' && search.theme ? { theme: search.theme } : {})
+  }),
   component: GamesPage
 });
 const gameRoute = createRoute({
@@ -150,10 +106,16 @@ const insightsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/ins
 const analysisRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/analysis',
-  validateSearch: (search: Record<string, unknown>) => ({ fen: typeof search.fen === 'string' ? search.fen : undefined }),
+  // fen: position to open; from: "game:<id>:<ply>" adds "Back to game"; tab=explorer and coach=true open those panels.
+  validateSearch: (search: Record<string, unknown>): { fen?: string; from?: string; tab?: 'explorer'; coach?: boolean } => ({
+    fen: typeof search.fen === 'string' ? search.fen : undefined,
+    from: typeof search.from === 'string' ? search.from : undefined,
+    tab: search.tab === 'explorer' ? 'explorer' : undefined,
+    coach: search.coach === true || search.coach === 'true' || search.coach === 1 ? true : undefined
+  }),
   component: function AnalysisRoutePage() {
-    const { fen } = analysisRoute.useSearch();
-    return <AnalysisBoardPage key={fen ?? 'start'} initialFen={fen} />;
+    const { fen, from, tab, coach } = analysisRoute.useSearch();
+    return <AnalysisBoardPage key={fen ?? 'start'} initialFen={fen} from={from} focus={coach ? 'coach' : tab} />;
   }
 });
 const playRoute = createRoute({

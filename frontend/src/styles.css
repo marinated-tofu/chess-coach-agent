@@ -1,10 +1,32 @@
 @import './styles/tokens.css';
 
+/*
+ * Global layer: type scale, base elements, app shell frame, buttons, focus, mobile baseline.
+ * Navigation styles live in components/AppNav.css.
+ */
 :root {
+  --fs-12: 0.75rem;
+  --fs-13: 0.8125rem;
+  --fs-14: 0.875rem;
+  --fs-16: 1rem;
+  --fs-20: 1.25rem;
+  --fs-24: 1.5rem;
+  --fs-32: 2rem;
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-sheet: 40;
+  --z-toast: 50;
+  --z-dialog: 60;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --focus-ring: var(--blue-500);
+
   color: var(--gray-950);
   background: var(--gray-50);
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 * {
@@ -14,6 +36,18 @@
 body {
   margin: 0;
   background: var(--gray-50);
+  font-size: var(--fs-14);
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+}
+
+p, li, dd {
+  text-wrap: pretty;
+}
+
+/* A modal sheet or dialog is open: keep the page behind it still. */
+html:has(dialog[open]) {
+  overflow: hidden;
 }
 
 a {
@@ -25,6 +59,41 @@ button, input, textarea, select {
   font: inherit;
 }
 
+a, button, input, select, textarea, summary, [role="button"], [tabindex] {
+  touch-action: manipulation;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* One ring for every control; component files should not restyle it. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+#main-content:focus {
+  outline: none;
+}
+
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: var(--z-dialog);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--gray-0);
+  background: var(--gray-950);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
 main {
   max-width: 1360px;
   margin: 0 auto;
@@ -32,73 +101,15 @@ main {
 }
 
 .app-frame {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: 214px minmax(0, 1fr);
 }
 
-.app-sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  padding: 22px 16px;
-  background: var(--gray-950);
-  color: var(--gray-100);
-  border-right: 1px solid var(--gray-900);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 0 10px 18px;
-  color: var(--gray-0);
-  font-weight: 700;
-}
-
-.app-sidebar nav {
-  display: grid;
-  gap: 5px;
-  padding-top: 8px;
-  border-top: 1px solid var(--gray-800);
-}
-
-.app-sidebar nav a {
-  display: grid;
-  grid-template-columns: 22px 1fr auto;
-  align-items: center;
-  gap: 9px;
-  min-height: 44px;
-  padding: 9px 11px;
-  border-radius: 7px;
-  color: var(--gray-300);
-  font-size: 14px;
-  font-weight: 750;
-}
-
-.app-sidebar nav a:hover {
-  color: var(--gray-0);
-  background: var(--gray-900);
-}
-
-.app-sidebar nav a.active {
-  color: var(--gray-0);
-  background: var(--gray-800);
-  box-shadow: inset 3px 0 0 var(--marker);
-}
-
-.app-sidebar nav a.active svg {
-  color: var(--marker);
-}
-
-.app-sidebar nav small {
-  min-width: 22px;
-  padding: 2px 6px;
-  border-radius: 5px;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.12);
-  font-size: 11px;
+@media (min-width: 721px) and (max-width: 1023px) {
+  .app-frame {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
 }
 
 .app-content {
@@ -135,7 +146,11 @@ main {
 }
 
 .page-actions {
+  display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .route-action {
@@ -277,40 +292,72 @@ main {
 h1 {
   margin: 8px 0 0;
   font-family: var(--font-display);
-  font-size: 36px;
+  font-size: var(--fs-32);
   font-weight: 600;
-  line-height: 1.1;
+  line-height: 1.15;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
-.primary, .secondary, .board-controls button, .moment-tabs button {
+/* Buttons: one .primary per view. Variants share height and press feedback. */
+.primary, .secondary, .ghost, .danger, .board-controls button, .moment-tabs button {
   border: 0;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: 600;
 }
 
-.primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
-  color: white;
-  background: var(--green-500);
-  box-shadow: var(--shadow-sm);
-}
-
-.secondary {
+.primary, .secondary, .ghost, .danger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 42px;
-  padding: 10px 14px;
+  min-height: 40px;
+  padding: 8px 16px;
+  line-height: 1.2;
+  transition: transform 120ms var(--ease-out), background-color 150ms ease, border-color 150ms ease;
+}
+
+.primary {
+  color: var(--gray-0);
+  background: var(--green-500);
+}
+
+.secondary {
+  padding: 8px 14px;
   color: var(--gray-900);
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
+}
+
+.ghost {
+  padding: 8px 10px;
+  color: var(--green-600);
+  background: transparent;
+}
+
+.danger {
+  color: var(--gray-0);
+  background: var(--red-500);
+}
+
+.primary:not(:disabled):active,
+.secondary:not(:disabled):active,
+.ghost:not(:disabled):active,
+.danger:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .primary:not(:disabled):hover { background: var(--green-600); }
+  .secondary:not(:disabled):hover { border-color: var(--gray-200); background: var(--gray-25); }
+  .ghost:not(:disabled):hover { background: var(--green-50); }
+  .danger:not(:disabled):hover { background: var(--red-600); }
+}
+
+.ghost:disabled, .danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .primary:disabled, .secondary:disabled, .board-controls button:disabled {
@@ -338,7 +385,7 @@ input, textarea, select {
   border: 1px solid var(--gray-150);
   border-radius: 8px;
   padding: 11px 12px;
-  background: white;
+  background: var(--gray-0);
   color: var(--gray-950);
 }
 
@@ -1076,7 +1123,9 @@ textarea {
   color: var(--gray-800);
 }
 
-.move-choices button:hover { border-color: var(--green-500); background: var(--gray-50); }
+@media (hover: hover) and (pointer: fine) {
+  .move-choices button:hover { border-color: var(--green-500); background: var(--gray-50); }
+}
 .move-entry { display: grid; grid-template-columns: 1fr 100px; gap: 9px; }
 .text-action { margin-top: 10px; padding: 8px 0; background: transparent; color: var(--green-500); }
 .quiz-hint { padding: 12px; border-left: 3px solid var(--amber-300); background: var(--amber-50); }
@@ -1148,9 +1197,6 @@ textarea {
   .event-row {
     grid-template-columns: 120px 1fr 24px;
   }
-  h1 {
-    font-size: 27px;
-  }
   .intake-workspace {
     grid-template-columns: 1fr;
     grid-template-areas:
@@ -1186,55 +1232,12 @@ textarea {
   .app-frame {
     display: block;
   }
-  .app-sidebar {
-    position: fixed;
-    z-index: 20;
-    top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: auto;
-    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
-    border-top: 1px solid var(--gray-800);
-    border-right: 0;
-  }
-  .brand {
-    display: none;
-  }
-  .app-sidebar nav {
-    display: flex;
-    gap: 2px;
-    padding: 0;
-    border: 0;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-  }
-  .app-sidebar nav::-webkit-scrollbar {
-    display: none;
-  }
-  .app-sidebar nav a {
-    display: flex;
-    flex: 0 0 68px;
-    flex-direction: column;
-    justify-content: center;
-    gap: 3px;
-    min-height: 52px;
-    padding: 5px 2px;
-    font-size: 11px;
-    text-align: center;
-    line-height: 1.15;
-    scroll-snap-align: start;
-  }
-  .app-sidebar nav a.active {
-    box-shadow: inset 0 2px 0 var(--marker);
-  }
-  .app-sidebar nav small {
-    display: none;
-  }
+  /* Room for the fixed tab bar and the home indicator. */
   .app-content {
-    padding-bottom: 76px;
+    padding-bottom: calc(49px + env(safe-area-inset-bottom) + 16px);
+  }
+  h1 {
+    font-size: var(--fs-24);
   }
   .page-header {
     align-items: flex-start;
@@ -1444,18 +1447,45 @@ textarea {
   font-size: 14px;
 }
 
-.primary:not(:disabled):active,
-.secondary:not(:disabled):active,
 .icon-button:active,
 .coach-suggestions button:not(:disabled):active {
   transform: scale(0.97);
 }
 
-.primary,
-.secondary,
 .icon-button,
 .coach-suggestions button {
-  transition: transform 160ms ease-out;
+  transition: transform 120ms var(--ease-out);
+}
+
+/* Touch screens: every control is at least 44 px. */
+@media (pointer: coarse) {
+  .primary, .secondary, .ghost, .danger,
+  .board-controls button, .moment-tabs button {
+    min-height: 44px;
+  }
+  .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+  input, select, textarea {
+    min-height: 44px;
+    /* Below 16 px iOS zooms the page on focus. */
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Reduced motion: no movement, keep short fades and the spinner. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+  }
+  .primary:active, .secondary:active, .ghost:active, .danger:active,
+  .icon-button:active, .coach-suggestions button:active {
+    transform: none !important;
+  }
+  .spin {
+    animation-duration: 1.5s;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {

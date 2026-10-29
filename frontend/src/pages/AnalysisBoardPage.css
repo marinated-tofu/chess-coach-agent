@@ -438,6 +438,27 @@
   }
 }
 
+/* Desktop: the board stays in view while the side column (engine, explorer, coach) scrolls. */
+@media (min-width: 981px) {
+  .analysis-board-column {
+    position: sticky;
+    top: 16px;
+  }
+}
+
+.analysis-anchor {
+  min-width: 0;
+  scroll-margin-top: 16px;
+}
+
+.analysis-page .coach-panel {
+  padding: 16px;
+}
+
+.analysis-page .coach-thread {
+  max-height: min(520px, 60dvh);
+}
+
 @media (max-width: 980px) {
   .analysis-workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -445,11 +466,15 @@
 }
 
 @media (max-width: 720px) {
-  /* The bottom tab bar is a 4-column grid; give every link one column so a fifth fits on one row. */
-  .app-sidebar nav {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
+  /* Phones: the board leads. Only the header's actions ("Back to game") stay. */
+  .analysis-page .page-header > div:first-child {
+    display: none;
+  }
+  .analysis-page .page-header:not(:has(.page-actions)) {
+    display: none;
+  }
+  .analysis-page .page-header {
+    margin-bottom: 10px;
   }
   .analysis-page {
     padding: 14px;

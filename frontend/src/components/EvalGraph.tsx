@@ -11,9 +11,10 @@ type Point = {
   move: ReviewMove | null;
 };
 
-const PLOT_BLACK = '#33383c';
-const PLOT_WHITE = '#f3f2ee';
-const CURRENT = '#1f8fe5';
+// SVG presentation attributes accept var(), so the plot reads the same tokens as the CSS.
+const PLOT_BLACK = 'var(--gray-800)';
+const PLOT_WHITE = 'var(--gray-50)';
+const CURRENT = 'var(--blue-500)';
 
 function describe(move: ReviewMove | null, win: number | null): string {
   if (!move) return 'Start position';
@@ -79,7 +80,7 @@ export function EvalGraph({
       if ((move.win_pct_loss ?? 0) > swing.drop) swing = { drop: move.win_pct_loss ?? 0, move };
     }
     const final = data[data.length - 1]?.win;
-    const parts = [`Win chance graph over ${moves.length} plies.`];
+    const parts = [`Win chance graph over ${Math.ceil(moves.length / 2)} moves.`];
     if (final != null) parts.push(`Ends at White ${Math.round(final)}%.`);
     if (swing.move) parts.push(`Biggest swing: ${moveLabel(swing.move)} ${swing.move.san}, ${Math.round(swing.drop)} points.`);
     parts.push(`${marked.length} mistakes, misses or blunders marked.`);
@@ -113,18 +114,18 @@ export function EvalGraph({
         >
           <XAxis dataKey="ply" type="number" domain={[0, Math.max(1, moves.length)]} hide />
           <YAxis domain={[0, 100]} hide />
-          <ReferenceLine y={50} stroke="#8b9399" strokeDasharray="3 3" strokeWidth={1} ifOverflow="hidden" />
+          <ReferenceLine y={50} stroke="var(--gray-400)" strokeDasharray="3 3" strokeWidth={1} ifOverflow="hidden" />
           {current && <ReferenceLine x={current.ply} stroke={CURRENT} strokeWidth={2} ifOverflow="hidden" />}
           <Tooltip
             content={<GraphTooltip />}
-            cursor={{ stroke: '#c7ccd1', strokeWidth: 1 }}
+            cursor={{ stroke: 'var(--gray-200)', strokeWidth: 1 }}
             isAnimationActive={false}
           />
           <Area
             type="linear"
             dataKey="win"
             baseValue={0}
-            stroke="#c9cdd1"
+            stroke="var(--gray-200)"
             strokeWidth={1}
             fill={PLOT_WHITE}
             fillOpacity={1}
@@ -142,7 +143,7 @@ export function EvalGraph({
                   cy={cy}
                   r={4}
                   fill={MOVE_LABELS[payload.label].color}
-                  stroke={payload.ply === currentPly ? CURRENT : '#ffffff'}
+                  stroke={payload.ply === currentPly ? CURRENT : 'var(--gray-0)'}
                   strokeWidth={2}
                 />
               );

@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   ArrowUp,
   Check,
@@ -98,11 +98,17 @@ export function CoachPanel({
   gameId,
   fen,
   suggestions,
-  onAnnotations
+  onAnnotations,
+  prefill,
+  autoFocus = false
 }: {
   gameId?: string;
   fen?: string;
   suggestions: string[];
+  /** Puts `text` in the input and focuses it; a new `nonce` repeats the same text. */
+  prefill?: { text: string; nonce: number } | null;
+  /** Focus the question input on mount, e.g. when a link asked for the coach. */
+  autoFocus?: boolean;
   /** Receives the verified arrows and highlights of the latest answer; called with empty lists on reset. */
   onAnnotations?: (arrows: BoardArrow[], highlights: SquareHighlight[]) => void;
 }) {
@@ -114,6 +120,20 @@ export function CoachPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const threadRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!prefill) return;
+    setQuestion(prefill.text);
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus({ preventScroll: true });
+    input.setSelectionRange(prefill.text.length, prefill.text.length);
+  }, [prefill?.nonce]);
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus({ preventScroll: true });
+  }, [autoFocus]);
   // Speech recognition calls back after the render that started it, so it needs the latest ask().
   const askRef = useRef<(text: string) => Promise<void>>(async () => {});
 
@@ -243,11 +263,8 @@ export function CoachPanel({
       {messages.length === 0 ? (
         <div className="coach-empty">
           <p>Ask about this position or your play. The coach checks claims with Stockfish and your saved games.</p>
-          <button className="primary" type="button" disabled={pending} onClick={() => ask(suggestions[0])}>
-            {suggestions[0]}
-          </button>
           <div className="coach-suggestions">
-            {suggestions.slice(1).map((suggestion) => (
+            {suggestions.map((suggestion) => (
               <button key={suggestion} type="button" disabled={pending} onClick={() => ask(suggestion)}>{suggestion}</button>
             ))}
           </div>
@@ -331,6 +348,8 @@ export function CoachPanel({
 
       <form className="coach-input" onSubmit={submit}>
         <input
+          ref={inputRef}
+          id="coach-question"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder={speech.listening ? 'Listening…' : 'Ask the coach…'}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Any
@@ -161,6 +162,10 @@ COACH_INSTRUCTIONS = dedent(
     the context). Arrows of kind best, played, or threat must be legal moves in that FEN; illegal
     ones are removed before the player sees them. Use at most 4 arrows and 4 highlights, and
     leave both empty when the answer is not about that position.
+    Write for a person, not a program. Never put a FEN string in the answer, evidence,
+    principle, or drill: describe positions in words ("after 14...Nf6, with your queen on d1")
+    and name moves in SAN. A drill states the task and what to look for; it never gives away
+    the move that solves it.
     """
 ).strip()
 
@@ -305,13 +310,44 @@ async def ask_coach(
     return _annotated(response, fen)
 
 
+_FEN_RANKS = r"[pnbrqkPNBRQK1-8]{1,8}(?:/[pnbrqkPNBRQK1-8]{1,8}){7}"
+_FEN_TAIL = r"(?:\s+[wb](?:\s+(?:-|[KQkq]{1,4}))?(?:\s+(?:-|[a-h][36]))?(?:\s+\d+){0,2})?"
+_FEN_BODY = rf"`?(?<![\w/]){_FEN_RANKS}{_FEN_TAIL}`?"
+# "(FEN: ...)" asides add nothing once the FEN is gone, so they go entirely.
+_FEN_ASIDE_RE = re.compile(rf"\s*[(\[]\s*(?:FEN\b:?\s*)?{_FEN_BODY}\s*[)\]]", re.IGNORECASE)
+_FEN_RE = re.compile(rf"(?:\bFEN\b:?\s*)?{_FEN_BODY}", re.IGNORECASE)
+
+
+def scrub_fen(text: str) -> str:
+    """Replace FEN strings in coach prose with plain words; the board already shows the position."""
+    if "/" not in text:
+        return text
+    cleaned = _FEN_ASIDE_RE.sub("", text)
+    cleaned = _FEN_RE.sub("this position", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return re.sub(r" +([.,;:])", r"\1", cleaned)
+
+
+def _scrub_coaching(coaching: CoachingOutput) -> CoachingOutput:
+    return coaching.model_copy(
+        update={
+            "answer": scrub_fen(coaching.answer),
+            "evidence": [scrub_fen(item) for item in coaching.evidence],
+            "principle": scrub_fen(coaching.principle),
+            "drill": scrub_fen(coaching.drill),
+        }
+    )
+
+
 def _annotated(response: CoachAskResponse, fen: str | None) -> CoachAskResponse:
-    """Keep only board arrows and highlights that python-chess confirms for the FEN."""
-    coaching, dropped = apply_annotations(response.coaching, fen)
+    """Keep only board arrows and highlights that python-chess confirms for the FEN, and
+    replace any FEN the model wrote into the prose."""
+    coaching, dropped = apply_annotations(_scrub_coaching(response.coaching), fen)
     if dropped:
         logfire.info("coach_annotations_dropped", dropped=dropped)
     return response.model_copy(
         update={
+            "answer": coaching.answer,
             "coaching": coaching,
             "arrows": coaching.arrows,
             "highlights": coaching.highlights,

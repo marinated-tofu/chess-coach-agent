@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Link } from '@tanstack/react-router';
 import { useWorkspace } from '../workspace/WorkspaceContext';
 import {
   getLichessExplorer,
@@ -189,7 +190,7 @@ export function OpeningExplorer({ fen, onPlayMove }: OpeningExplorerProps) {
         ) : !result ? (
           <ExplorerSkeleton />
         ) : result.kind === 'player' ? (
-          <PlayerTable data={result.data} stale={stale} onPlayMove={onPlayMove} onEmptyAction={() => selectTab('masters')} />
+          <PlayerTable data={result.data} fen={fen} stale={stale} onPlayMove={onPlayMove} onEmptyAction={() => selectTab('masters')} />
         ) : (
           <LichessTable data={result.data} stale={stale} onPlayMove={onPlayMove} />
         )}
@@ -232,11 +233,13 @@ function ResultBar({ segments, label }: { segments: Array<{ value: number; tone:
 
 function PlayerTable({
   data,
+  fen,
   stale,
   onPlayMove,
   onEmptyAction
 }: {
   data: PlayerExplorerResponse;
+  fen: string;
   stale: boolean;
   onPlayMove: (san: string) => void;
   onEmptyAction: () => void;
@@ -257,6 +260,14 @@ function PlayerTable({
           <strong>You often go wrong here.</strong> {mistake.san} went wrong in {mistake.mistakes} of {mistake.player_moves} games,
           {' '}usually as {mistake.label === 'inaccuracy' ? 'an' : 'a'} {mistake.label}
           {mistake.best_san && mistake.best_san !== mistake.san ? <>. The engine prefers <strong>{mistake.best_san}</strong>.</> : '.'}
+          {' '}
+          <Link
+            className="explorer-link explorer-rep-link"
+            to="/repertoire"
+            search={{ fen, color: fen.split(' ')[1] === 'b' ? 'black' : 'white' } as Record<string, string>}
+          >
+            Add to repertoire
+          </Link>
         </p>
       )}
       <div className="explorer-table" role="table" aria-label="Moves from your games">

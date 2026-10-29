@@ -419,3 +419,11 @@
     padding: 0 4px;
   }
 }
+
+.explorer-rep-link {
+  color: var(--red-800);
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

@@ -30,31 +30,388 @@
   border: 0;
 }
 
-/* ---------- Layout ---------- */
+/* ---------- Layout ----------
+ * Desktop: board column on the left, pinned while the right column scrolls. The board is sized
+ * from the viewport height so the whole board, its nav and the current-move strip fit on screen.
+ * Under 1024 px: one column in the order board, nav, current-move strip, tabs.
+ */
 
-.layout.review-layout {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 24px;
+.review-page {
+  --rv-board: min(640px, calc(100dvh - 350px));
+}
+
+.rv-layout {
+  display: grid;
+  grid-template-columns: calc(max(320px, var(--rv-board)) + 32px) minmax(0, 1fr);
+  gap: 28px;
   align-items: start;
 }
 
-.review-layout .review-board-panel {
-  position: static;
+.rv-board-col {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-height: calc(100dvh - 32px);
+}
+
+.rv-board-col .review-board-row {
+  width: 100%;
+}
+
+.rv-board-col .player-pill,
+.rv-board-col .player-pill.above-board,
+.rv-board-col .player-pill.below-board {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.rv-board-col .rv-controls {
+  width: 100%;
+  margin: 0;
+}
+
+.rv-icon-link {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  color: var(--gray-800);
+}
+
+.rv-side {
   min-width: 0;
 }
 
-.review-layout .review-main {
-  min-width: 0;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.review-layout .review-main > * {
+.rv-side-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   min-width: 0;
 }
 
-@media (max-width: 1180px) {
-  .layout.review-layout {
+.rv-side-inner > * {
+  min-width: 0;
+}
+
+.rv-panel {
+  min-width: 0;
+}
+
+.rv-panel[hidden] {
+  display: none;
+}
+
+.rv-section-title {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.rv-quiet {
+  margin: 0;
+  color: var(--rv-muted);
+}
+
+.rv-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--gray-100);
+  scroll-margin-top: 12px;
+}
+
+.rv-tabs button {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--gray-600);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.rv-tabs button[aria-selected="true"] {
+  background: var(--gray-0);
+  color: var(--gray-950);
+  box-shadow: var(--shadow-sm);
+}
+
+.rv-tabs small {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--gray-150);
+  color: var(--gray-700);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rv-moments,
+.rv-game-summary,
+.rv-moves-panel {
+  padding: 20px;
+  border-radius: var(--radius-md);
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-line);
+}
+
+.rv-moves-panel .mv-list,
+.rv-moves-panel .heatmap-bar {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.rv-moves-panel .mv-list {
+  margin-bottom: 14px;
+}
+
+.rv-moves-panel .mv-scroll {
+  max-height: min(420px, 50dvh);
+}
+
+.rv-game-summary p {
+  margin: 0;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.rv-game-summary h3 {
+  margin: 18px 0 4px;
+  font-size: 14px;
+}
+
+.review-page .coach-panel {
+  box-shadow: none;
+  border: 1px solid var(--rv-line);
+}
+
+/* Moments */
+
+.review-page .moment-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  grid-template-columns: none;
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.review-page .moment-tabs button {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--rv-line);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.review-page .moment-tabs button.active {
+  border-color: var(--marker);
+  color: var(--gray-950);
+}
+
+.rv-moment-head {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin-bottom: 14px;
+}
+
+.rv-moment-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto 0 0;
+  font-size: 17px;
+}
+
+.rv-moment-label {
+  color: var(--rv-ink-2);
+  font-weight: 650;
+}
+
+.review-page .critical-card {
+  margin-bottom: 14px;
+}
+
+.review-page .move-box strong {
+  font-size: 20px;
+}
+
+.rv-moment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rv-inline-error {
+  margin: 8px 0 0;
+  color: var(--red-600);
+  font-size: 13px;
+}
+
+.review-page .prose-card {
+  margin-bottom: 0;
+}
+
+.review-page .analysis-block:first-child {
+  margin-top: 0;
+}
+
+.review-page .analysis-block h3 {
+  margin: 0 0 6px;
+  color: var(--gray-600);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* "More" menu in the header */
+
+.rv-more {
+  position: relative;
+}
+
+.rv-more summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.rv-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.rv-more-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  min-width: 210px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  box-shadow: var(--shadow-md);
+}
+
+.rv-more-menu a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rv-more-menu a:hover,
+  .rv-tabs button:not([aria-selected="true"]):hover {
+    background: var(--gray-50);
+  }
+}
+
+.rv-loading {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  gap: 28px;
+}
+
+/* One column: tablets and phones. */
+@media (max-width: 1023px) {
+  .rv-layout {
     grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .rv-board-col {
+    position: static;
+    max-height: none;
+    width: min(100%, 600px);
+    justify-self: center;
+  }
+  .rv-loading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The summary moves into its own tab after the tab bar. */
+  .rv-summary-slot {
+    order: 2;
+  }
+  .rv-side-inner[data-tab="summary"] .rv-panel[data-panel="summary"] {
+    order: 3;
+  }
+  .rv-side-inner:not([data-tab="summary"]) .rv-summary-slot {
+    display: none;
+  }
+  .rv-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+  }
+  /* Coach tab: pin a smaller board at the top so arrows from answers stay in view. */
+  .rv-layout[data-compact] .rv-board-col {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 6px 0;
+    background: var(--gray-50);
+  }
+  .rv-layout[data-compact] .review-board-row {
+    width: min(100%, 40dvh);
+    margin: 0 auto;
+  }
+  .rv-layout[data-compact] .player-pill,
+  .rv-layout[data-compact] .rv-current,
+  .rv-layout[data-compact] .retry-panel {
+    display: none;
+  }
+  .rv-layout[data-compact] .rv-controls {
+    margin: 0;
+  }
+  .rv-layout[data-compact] .rv-tabs {
+    position: static;
+  }
+  .review-page .coach-thread {
+    max-height: none;
+  }
+}
+
+/* The page header and summary come first in the DOM but the board leads on phones. */
+@media (max-width: 720px) {
+  .review-page .page-header {
+    margin-bottom: 12px;
+  }
+  .review-page .page-header p {
+    margin-top: 2px;
+  }
+  .rv-moments,
+  .rv-game-summary,
+  .rv-moves-panel {
+    padding: 14px 12px;
+  }
+  .rv-tabs button {
+    min-height: 40px;
+    padding: 6px 4px;
   }
 }
 
@@ -62,9 +419,9 @@
 
 .review-summary {
   display: grid;
-  gap: 14px;
-  margin: 0 0 24px;
-  padding: 18px 20px;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 18px;
   border-radius: 8px;
   background: var(--rv-surface);
   border: 1px solid var(--rv-line);
@@ -104,7 +461,7 @@
 
 .rs-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
@@ -119,7 +476,7 @@
   display: grid;
   gap: 2px;
   min-width: 0;
-  padding: 14px;
+  padding: 10px 12px;
   border-radius: 8px;
   background: var(--rv-surface-2);
   border: 1px solid var(--rv-line);
@@ -163,7 +520,7 @@
 }
 
 .rs-player strong {
-  font-size: 34px;
+  font-size: 28px;
   line-height: 1.1;
   font-weight: 700;
   color: var(--rv-ink);
@@ -218,13 +575,23 @@
 }
 
 .rs-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0;
   color: var(--rv-muted);
   font-size: 13px;
   text-wrap: pretty;
+}
+
+.rs-toggle {
+  grid-column: 2;
+  justify-self: end;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--blue-600);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
 }
 
 @media (max-width: 860px) {
@@ -383,17 +750,20 @@
 /* ---------- Current move strip ---------- */
 
 .rv-current {
-  display: grid;
+  display: flex;
+  align-items: center;
   gap: 10px;
   width: 100%;
-  margin: 0 0 14px;
-  padding: 12px;
+  margin: 0;
+  padding: 10px 12px;
   border-radius: 8px;
   background: var(--rv-surface-2);
   border: 1px solid var(--rv-line);
 }
 
 .rv-current-move {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -427,10 +797,8 @@
   font-weight: 650;
 }
 
-.rv-current-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.rv-current-retry {
+  flex: 0 0 auto;
 }
 
 /* ---------- Retry ---------- */
@@ -439,7 +807,7 @@
   display: grid;
   gap: 10px;
   width: 100%;
-  margin: 0 0 14px;
+  margin: 0;
   padding: 14px;
   border-radius: 8px;
   border: 1px solid var(--green-200);

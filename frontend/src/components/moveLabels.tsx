@@ -5,16 +5,17 @@ type LabelMeta = { name: string; glyph: string; color: string };
 
 /** One glyph and one color per label, used by the move list, graph markers and summary. */
 export const MOVE_LABELS: Record<MoveClassification, LabelMeta> = {
+  // Teal, orange and rose have no ramp in tokens.css; they keep the conventional label colors.
   brilliant: { name: 'Brilliant', glyph: '!!', color: '#12817c' },
-  great: { name: 'Great', glyph: '!', color: '#2b66a3' },
-  best: { name: 'Best', glyph: '★', color: '#3b7f2b' },
-  excellent: { name: 'Excellent', glyph: '✓', color: '#557a2e' },
-  good: { name: 'Good', glyph: '✓', color: '#5f6e66' },
-  book: { name: 'Book', glyph: 'B', color: '#86643d' },
-  inaccuracy: { name: 'Inaccuracy', glyph: '?!', color: '#94650a' },
+  great: { name: 'Great', glyph: '!', color: 'var(--blue-500)' },
+  best: { name: 'Best', glyph: '★', color: 'var(--green-500)' },
+  excellent: { name: 'Excellent', glyph: '✓', color: 'var(--green-600)' },
+  good: { name: 'Good', glyph: '✓', color: 'var(--gray-600)' },
+  book: { name: 'Book', glyph: 'B', color: 'var(--amber-700)' },
+  inaccuracy: { name: 'Inaccuracy', glyph: '?!', color: 'var(--amber-600)' },
   mistake: { name: 'Mistake', glyph: '?', color: '#b4520f' },
   miss: { name: 'Miss', glyph: '✕', color: '#b2375a' },
-  blunder: { name: 'Blunder', glyph: '??', color: '#a8202b' }
+  blunder: { name: 'Blunder', glyph: '??', color: 'var(--red-600)' }
 };
 
 /** Display order for the summary table, best to worst. */
@@ -39,4 +40,18 @@ export function MoveBadge({ label, size = 'sm' }: { label: MoveClassification; s
       {label === 'book' ? <BookOpen size={size === 'md' ? 12 : 10} strokeWidth={2.6} /> : meta.glyph}
     </span>
   );
+}
+
+/**
+ * The label a critical moment shows. Moments carry their own severity (`judgment`), but the move
+ * list, graph and current-move strip use the move's classification, so the moment uses that too
+ * and one move never reads "Miss" in one place and "Blunder" in another. Severity stays only as
+ * the moment's sort order.
+ */
+export function momentLabel(
+  moves: ReadonlyArray<{ ply: number; classification?: MoveClassification | null }>,
+  moment: { ply: number; judgment: MoveClassification }
+): MoveClassification {
+  const move = moves[moment.ply - 1]?.ply === moment.ply ? moves[moment.ply - 1] : moves.find((item) => item.ply === moment.ply);
+  return move?.classification ?? moment.judgment;
 }

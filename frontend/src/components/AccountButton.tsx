@@ -9,7 +9,6 @@ import './AccountButton.css';
 const AUTH_KEY = ['auth-me'] as const;
 // Remembers which Lichess account was already applied, so a later manual choice is never overwritten.
 const LINKED_KEY = 'chess-coach-lichess-linked';
-const SAMPLE_PLAYER = 'kfctofu';
 
 function readLinked() {
   try {
@@ -48,8 +47,8 @@ export function AccountButton() {
 
   useEffect(() => {
     if (!username || readLinked() === username.toLowerCase()) return;
-    const untouched = !player.trim() || (player === SAMPLE_PLAYER && platform === 'chess.com');
-    if (untouched) applyAccount(username);
+    // Only fill an empty identity; a username the user typed (or the sample) is left alone.
+    if (!player.trim()) applyAccount(username);
     // Only re-check when the signed-in account changes.
   }, [username]);
 

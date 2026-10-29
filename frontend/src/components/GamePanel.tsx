@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import {
   ChevronLeft,
@@ -8,8 +8,7 @@ import {
   FlipVertical2,
   Map,
   Microscope,
-  RotateCcw,
-  Trophy
+  RotateCcw
 } from 'lucide-react';
 import { ARROW_COLORS, ChessBoard, type BoardArrow, type BoardHighlight } from './ChessBoard';
 import { EvalBar } from './EvalBar';
@@ -53,13 +52,22 @@ export function GamePanel({
   currentPly,
   setCurrentPly,
   coachArrows = [],
-  coachHighlights = []
+  coachHighlights = [],
+  retryRequest,
+  compactBoard = false,
+  renderSide
 }: {
   analysis: CoachAnalysis | null;
   currentPly: number;
   setCurrentPly: (ply: number) => void;
   coachArrows?: BoardArrow[];
   coachHighlights?: BoardHighlight[];
+  /** Starts a retry of the move at `ply`; a new `nonce` asks again for the same ply. */
+  retryRequest?: { ply: number; nonce: number } | null;
+  /** Small screens: keep only the board pinned at the top (used while the coach tab is open). */
+  compactBoard?: boolean;
+  /** The right-hand column. Receives the moves panel (graph, move list, square control) to place in a tab. */
+  renderSide: (movesPanel: ReactNode) => ReactNode;
 }) {
   const [heatmapMode, setHeatmapMode] = useState<HeatmapMode>('you');
   const [flipState, setFlipState] = useState({ gameId: '', flipped: false });
@@ -102,23 +110,41 @@ export function GamePanel({
     stop();
   }, [gameId]);
 
+  useEffect(() => {
+    if (!retryRequest) return;
+    const move = moves[retryRequest.ply - 1];
+    if (!move) return;
+    setCurrentPly(move.ply);
+    start(move);
+  }, [retryRequest?.nonce]);
+
   // ←/→/Home/End step through the game unless the user is typing or retrying.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (retry || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       if (isEditable(event.target)) return;
+      if (event.key === 'f') {
+        event.preventDefault();
+        setFlipState({ gameId, flipped: !flipped });
+        return;
+      }
+      if (event.key === 'r' && canRetry && currentMove) {
+        event.preventDefault();
+        start(currentMove);
+        return;
+      }
       let next: number | null = null;
-      if (event.key === 'ArrowLeft') next = Math.max(0, clampedPly - 1);
-      else if (event.key === 'ArrowRight') next = Math.min(moves.length, clampedPly + 1);
-      else if (event.key === 'Home') next = 0;
-      else if (event.key === 'End') next = moves.length;
+      if (event.key === 'ArrowLeft' || event.key === 'k') next = Math.max(0, clampedPly - 1);
+      else if (event.key === 'ArrowRight' || event.key === 'j') next = Math.min(moves.length, clampedPly + 1);
+      else if (event.key === 'Home' || event.key === 'ArrowUp') next = 0;
+      else if (event.key === 'End' || event.key === 'ArrowDown') next = moves.length;
       if (next === null) return;
       event.preventDefault();
       if (next !== clampedPly) setCurrentPly(next);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [retry, clampedPly, moves.length, setCurrentPly]);
+  }, [retry, clampedPly, moves.length, setCurrentPly, canRetry, currentMove, flipped, gameId, start]);
 
   // Board marks: review mode shows the last move and the engine's better move; retry mode shows its own.
   const arrows: BoardArrow[] = [];
@@ -155,93 +181,8 @@ export function GamePanel({
   const label = currentMove?.classification ? MOVE_LABELS[currentMove.classification] : null;
   const clock = formatClock(currentMove?.clock_seconds);
 
-  return (
-    <section className="panel game-panel review-board-panel" aria-label="Game board">
-      <div className="panel-title"><Trophy size={18} aria-hidden="true" /> Board</div>
-      <PlayerPill
-        className="above-board"
-        color={topColor}
-        name={topColor === 'black' ? analysis?.game.black || 'Black' : analysis?.game.white || 'White'}
-      />
-      <div className="review-board-row" data-engine={engine || undefined}>
-        {engine && <EvalBar winPct={winPct} evalText={evalText} orientation={orientation} />}
-        <div className="review-board">
-          <ChessBoard
-            fen={fen}
-            heatmapMode={retry ? 'off' : heatmapMode}
-            youColor={youColor}
-            orientation={orientation}
-            whiteControl={control.white}
-            blackControl={control.black}
-            arrows={arrows}
-            highlights={highlights}
-            lastMove={lastMove}
-            onMove={retry && retry.status === 'playing' ? submit : undefined}
-          />
-        </div>
-      </div>
-      <PlayerPill
-        className="below-board"
-        color={orientation}
-        name={orientation === 'black' ? analysis?.game.black || 'Black' : analysis?.game.white || 'White'}
-      />
-
-      {retry ? (
-        <RetryPanel retry={retry} onAgain={again} onReveal={reveal} onBack={stop} />
-      ) : (
-        <>
-          <div className="board-controls rv-controls">
-            <button type="button" title="Start" aria-label="Start" onClick={() => setCurrentPly(0)} disabled={!moves.length || clampedPly === 0}><ChevronsLeft size={16} /></button>
-            <button type="button" title="Previous move" aria-label="Previous move" onClick={() => setCurrentPly(Math.max(0, clampedPly - 1))} disabled={!moves.length || clampedPly === 0}><ChevronLeft size={16} /></button>
-            <span className="ply-counter tnum">{moves.length ? `${clampedPly}/${moves.length}` : '0/0'}</span>
-            <button type="button" title="Next move" aria-label="Next move" onClick={() => setCurrentPly(Math.min(moves.length, clampedPly + 1))} disabled={!moves.length || clampedPly === moves.length}><ChevronRight size={16} /></button>
-            <button type="button" title="End" aria-label="End" onClick={() => setCurrentPly(moves.length)} disabled={!moves.length || clampedPly === moves.length}><ChevronsRight size={16} /></button>
-            <button
-              type="button"
-              title="Flip board"
-              aria-label="Flip board"
-              aria-pressed={flipped}
-              onClick={() => setFlipState({ gameId, flipped: !flipped })}
-            >
-              <FlipVertical2 size={16} />
-            </button>
-          </div>
-
-          <div className="rv-current" aria-live="polite">
-            {currentMove ? (
-              <div className="rv-current-move">
-                {engine && currentMove.classification && <MoveBadge label={currentMove.classification} size="md" />}
-                <span className="rv-current-text">
-                  <strong>{moveLabel(currentMove)} {currentMove.san}</strong>
-                  {engine && label && <span className="rv-current-label">{label.name}</span>}
-                  {engine && currentMove.best_san && currentMove.best_uci !== currentMove.uci && !NOT_WORTH_AN_ARROW.has(currentMove.classification ?? '') && (
-                    <span className="rv-current-best">Best was <strong>{currentMove.best_san}</strong></span>
-                  )}
-                </span>
-                {engine && (
-                  <span className="rv-current-meta tnum">
-                    {formatEvalValue(currentMove.eval_cp, currentMove.eval_mate, currentMove.color)}
-                    {clock ? ` · ${clock}` : ''}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div className="rv-current-move"><span>Start position. Press → to step through the game.</span></div>
-            )}
-            <div className="rv-current-actions">
-              {canRetry && currentMove && (
-                <button type="button" className="rv-button rv-button-primary" onClick={() => start(currentMove)}>
-                  <RotateCcw size={15} aria-hidden="true" /> Retry this move
-                </button>
-              )}
-              <Link className="rv-button" to="/analysis" search={{ fen }}>
-                <Microscope size={15} aria-hidden="true" /> Open in analysis board
-              </Link>
-            </div>
-          </div>
-        </>
-      )}
-
+  const movesPanel = (
+    <div className="rv-moves-panel">
       {engine && (
         <EvalGraph
           moves={moves}
@@ -257,7 +198,7 @@ export function GamePanel({
         momentPlies={momentPlies}
         showLabels={engine}
         onSelectPly={(ply) => setCurrentPly(ply)}
-        caption={analysis ? `${analysis.game.result} · ${analysis.game.player_result}` : 'Load a game'}
+        caption={analysis ? `${analysis.game.result} · ${Math.ceil(moves.length / 2)} moves` : 'Load a game'}
       />
 
       <div className="heatmap-bar" data-mode={heatmapMode}>
@@ -297,7 +238,103 @@ export function GamePanel({
           </div>
         )}
       </div>
-    </section>
+    </div>
+  );
+
+  // Ply of the move on the board, for the analysis board's "Back to game".
+  const analysisFrom = gameId ? `game:${gameId}:${clampedPly}` : undefined;
+
+  return (
+    <div className="rv-layout" data-compact={compactBoard || undefined}>
+      <section className="rv-board-col review-board-panel" aria-label="Game board">
+        <h2 className="rv-sr-only">Board</h2>
+        <PlayerPill
+          className="above-board"
+          color={topColor}
+          name={topColor === 'black' ? analysis?.game.black || 'Black' : analysis?.game.white || 'White'}
+        />
+        <div className="review-board-row" data-engine={engine || undefined}>
+          {engine && <EvalBar winPct={winPct} evalText={evalText} orientation={orientation} />}
+          <div className="review-board">
+            <ChessBoard
+              fen={fen}
+              heatmapMode={retry ? 'off' : heatmapMode}
+              youColor={youColor}
+              orientation={orientation}
+              whiteControl={control.white}
+              blackControl={control.black}
+              arrows={arrows}
+              highlights={highlights}
+              lastMove={lastMove}
+              onMove={retry && retry.status === 'playing' ? submit : undefined}
+            />
+          </div>
+        </div>
+        <PlayerPill
+          className="below-board"
+          color={orientation}
+          name={orientation === 'black' ? analysis?.game.black || 'Black' : analysis?.game.white || 'White'}
+        />
+
+        {retry ? (
+          <RetryPanel retry={retry} onAgain={again} onReveal={reveal} onBack={stop} />
+        ) : (
+          <>
+            <div className="board-controls rv-controls">
+              <button type="button" title="Start (Home)" aria-label="Start" onClick={() => setCurrentPly(0)} disabled={!moves.length || clampedPly === 0}><ChevronsLeft size={16} /></button>
+              <button type="button" title="Previous move (←)" aria-label="Previous move" onClick={() => setCurrentPly(Math.max(0, clampedPly - 1))} disabled={!moves.length || clampedPly === 0}><ChevronLeft size={16} /></button>
+              <span className="ply-counter tnum" aria-label={`Move ${Math.ceil(clampedPly / 2)} of ${Math.ceil(moves.length / 2)}`}>
+                {moves.length ? `${clampedPly}/${moves.length}` : '0/0'}
+              </span>
+              <button type="button" title="Next move (→)" aria-label="Next move" onClick={() => setCurrentPly(Math.min(moves.length, clampedPly + 1))} disabled={!moves.length || clampedPly === moves.length}><ChevronRight size={16} /></button>
+              <button type="button" title="End (End)" aria-label="End" onClick={() => setCurrentPly(moves.length)} disabled={!moves.length || clampedPly === moves.length}><ChevronsRight size={16} /></button>
+              <button
+                type="button"
+                title="Flip board (f)"
+                aria-label="Flip board"
+                aria-pressed={flipped}
+                onClick={() => setFlipState({ gameId, flipped: !flipped })}
+              >
+                <FlipVertical2 size={16} />
+              </button>
+              <Link className="rv-icon-link" to="/analysis" search={{ fen, from: analysisFrom }} title="Open in analysis" aria-label="Open in analysis">
+                <Microscope size={16} />
+              </Link>
+            </div>
+
+            <div className="rv-current" aria-live="polite">
+              {currentMove ? (
+                <div className="rv-current-move">
+                  {engine && currentMove.classification && <MoveBadge label={currentMove.classification} size="md" />}
+                  <span className="rv-current-text">
+                    <strong>{moveLabel(currentMove)} {currentMove.san}</strong>
+                    {engine && label && <span className="rv-current-label">{label.name}</span>}
+                    {engine && currentMove.best_san && currentMove.best_uci !== currentMove.uci && !NOT_WORTH_AN_ARROW.has(currentMove.classification ?? '') && (
+                      <span className="rv-current-best">Best was <strong>{currentMove.best_san}</strong></span>
+                    )}
+                  </span>
+                  {engine && (
+                    <span className="rv-current-meta tnum">
+                      {formatEvalValue(currentMove.eval_cp, currentMove.eval_mate, currentMove.color)}
+                      {clock ? ` · ${clock}` : ''}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="rv-current-move"><span>Start position. Press → to step through the game.</span></div>
+              )}
+              {canRetry && currentMove && (
+                <button type="button" className="rv-button rv-current-retry" onClick={() => start(currentMove)} title="Retry this move (r)">
+                  <RotateCcw size={15} aria-hidden="true" /> Retry
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </section>
+
+      <div className="rv-side">{renderSide(movesPanel)}</div>
+    </div>
   );
 }
 

@@ -1,7 +1,12 @@
-import { BookOpen, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { BookOpen } from 'lucide-react';
 import { countClassifications, hasEngineData, useGameOpening } from '../lib/reviewApi';
 import type { CoachAnalysis, Platform } from '../lib/types';
 import { LABEL_ORDER, MOVE_LABELS, MoveBadge } from './moveLabels';
+import type { MoveClassification } from '../lib/types';
+
+/** The labels worth counting at a glance; the rest sit behind "Show all labels". */
+const KEY_LABELS: MoveClassification[] = ['mistake', 'miss', 'blunder'];
 
 function formatAccuracy(value: number | null | undefined): string {
   return value == null ? '–' : value.toFixed(1);
@@ -18,6 +23,7 @@ export function ReviewSummary({
   platform: Platform | 'pgn';
 }) {
   const opening = useGameOpening(username, platform, analysis.game.game_id);
+  const [showAll, setShowAll] = useState(false);
   const engine = hasEngineData(analysis);
   const counts = countClassifications(analysis);
   const you = analysis.game.player_color;
@@ -33,7 +39,7 @@ export function ReviewSummary({
         <BookOpen size={15} aria-hidden="true" />
         {openingName ? (
           <span>
-            <strong>{openingName}</strong>
+            <strong title={openingName}>{openingName}</strong>
             {opening.data?.eco && opening.data.name ? <small className="tnum">{opening.data.eco}</small> : null}
           </span>
         ) : (
@@ -68,7 +74,7 @@ export function ReviewSummary({
               </tr>
             </thead>
             <tbody>
-              {LABEL_ORDER.map((label) => {
+              {(showAll ? LABEL_ORDER : KEY_LABELS).map((label) => {
                 const white = counts.white[label] ?? 0;
                 const black = counts.black[label] ?? 0;
                 return (
@@ -84,12 +90,12 @@ export function ReviewSummary({
               })}
             </tbody>
           </table>
+          <button type="button" className="rs-toggle" aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
+            {showAll ? 'Show fewer labels' : 'Show all labels'}
+          </button>
         </div>
       ) : (
-        <p className="rs-note">
-          <RefreshCw size={14} aria-hidden="true" />
-          This game was analyzed before move labels existed. Re-sync to get move labels and accuracy.
-        </p>
+        <p className="rs-note">Move labels and accuracy will show here once this game has been analyzed again.</p>
       )}
     </section>
   );

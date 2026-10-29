@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { Chess } from 'chess.js';
 import { AlertCircle, ArrowRight, Check, Copy, Flag, Loader2, MessageSquare, Microscope, RotateCcw, Swords, Undo2 } from 'lucide-react';
 import { ChessBoard, type BoardMove } from '../components/ChessBoard';
@@ -200,6 +200,7 @@ function GameScreen({
   onExit: () => void;
 }) {
   const { player, platform } = useWorkspace();
+  const navigate = useNavigate();
   const fen = game.moves[game.moves.length - 1]?.fen ?? game.startFen;
   const end = useMemo(() => gameEnd(game, fen), [game, fen]);
   const botToMove = !end && sideOf(fen) !== game.playerColor;
@@ -303,7 +304,13 @@ function GameScreen({
     setReview({ state: 'analyzing' });
     try {
       const result = await analyzeGames(buildPgn(game, end, username), username, 1, platform);
-      setReview({ state: 'ready', gameId: result.analyses[0]?.game.game_id ?? null });
+      const gameId = result.analyses[0]?.game.game_id ?? null;
+      if (gameId) {
+        // The game is in the library now; review it like any other game.
+        await navigate({ to: '/games/$gameId', params: { gameId }, search: { moment: undefined } });
+        return;
+      }
+      setReview({ state: 'ready', gameId: null });
     } catch (reason) {
       setReview({ state: 'failed', message: reason instanceof Error ? reason.message : 'The analysis failed.' });
     }
@@ -374,13 +381,14 @@ function GameScreen({
                 </button>
                 <button className="secondary" onClick={onRematch}><RotateCcw size={16} /> Rematch</button>
               </div>
+              {review.state === 'failed' && <p className="play-error" role="alert"><AlertCircle size={16} /> {review.message}</p>}
             </div>
           )}
 
           <div className="play-moves-card">
             <div className="play-moves-head">
               <strong>Moves</strong>
-              <span>{game.moves.length ? `${game.moves.length} ${game.moves.length === 1 ? 'ply' : 'plies'}` : 'No moves yet'}</span>
+              <span>{game.moves.length ? `${Math.ceil(game.moves.length / 2)} ${Math.ceil(game.moves.length / 2) === 1 ? 'move' : 'moves'}` : 'No moves yet'}</span>
             </div>
             <ol className="play-moves" ref={movesRef}>
               {rows.map((row) => (
@@ -427,7 +435,6 @@ function GameScreen({
             <button className="secondary" onClick={onExit}><Swords size={16} /> New game</button>
           </div>
 
-          {review.state === 'failed' && <p className="play-error"><AlertCircle size={16} /> {review.message}</p>}
           {review.state === 'ready' && end && (
             <>
               {review.gameId && (

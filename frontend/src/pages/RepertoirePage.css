@@ -387,3 +387,9 @@
   .rep-progress-track div,
   .rep-segmented button { transition: none; }
 }
+
+.rep-drill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

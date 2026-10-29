@@ -1,53 +1,90 @@
-import { ListChecks } from 'lucide-react';
-import type { CoachAnalysis } from '../lib/types';
+import { Link } from '@tanstack/react-router';
+import { Skeleton } from './Skeleton';
+import {
+  formatGameDate,
+  resultLabel,
+  themeLabel,
+  timeClassLabel,
+  type LibraryGame
+} from '../lib/libraryApi';
+import './GameList.css';
 
-function resultLabel(result: string) {
-  if (result === 'win') return 'Win';
-  if (result === 'loss') return 'Loss';
-  if (result === 'draw') return 'Draw';
-  return 'Unknown';
-}
-
-export function GameList({
-  analyses,
-  activeIndex,
-  onSelect
-}: {
-  analyses: CoachAnalysis[];
-  activeIndex: number;
-  onSelect: (index: number) => void;
-}) {
-  if (!analyses.length) return null;
+function GameRow({ game, onOpen }: { game: LibraryGame; onOpen?: (gameId: string) => void }) {
+  const date = formatGameDate(game.date);
+  const opponent = game.opponent || 'Unknown opponent';
+  const meta = [
+    timeClassLabel(game.time_class) || game.time_control,
+    date,
+    game.move_count ? `${game.move_count.toLocaleString()} moves` : ''
+  ].filter(Boolean);
+  const slips = [
+    game.blunders ? `${game.blunders} ${game.blunders === 1 ? 'blunder' : 'blunders'}` : '',
+    game.mistakes ? `${game.mistakes} ${game.mistakes === 1 ? 'mistake' : 'mistakes'}` : ''
+  ].filter(Boolean);
+  const colorLabel = game.player_color === 'white' ? 'White' : game.player_color === 'black' ? 'Black' : '';
 
   return (
-    <section className="game-list-panel">
-      <div className="game-list-head">
-        <div className="panel-title"><ListChecks size={18} /> Games</div>
-        <span>{analyses.length} analyzed</span>
+    <li>
+      <Link
+        className="library-row"
+        to="/games/$gameId"
+        params={{ gameId: game.game_id }}
+        search={{ moment: undefined }}
+        onClick={() => onOpen?.(game.game_id)}
+      >
+        <span className={`library-result library-result-${game.player_result}`}>
+          {resultLabel(game.player_result)}
+        </span>
+        <span className="library-main">
+          <strong>
+            {colorLabel && <span className={`library-piece library-piece-${game.player_color}`} aria-label={`You played ${colorLabel}`} />}
+            vs {opponent}
+            {game.opponent_elo ? <span className="library-elo"> ({game.opponent_elo})</span> : null}
+          </strong>
+          <span className="library-meta">{meta.join(' · ')}</span>
+        </span>
+        <span className="library-opening" title={game.opening || undefined}>
+          {game.opening || 'Opening not named'}
+          {game.top_themes.length > 0 && (
+            <span className="library-themes">{game.top_themes.slice(0, 2).map(themeLabel).join(', ')}</span>
+          )}
+        </span>
+        <span className="library-stats">
+          <span className="library-accuracy">{game.accuracy == null ? '–' : `${Math.round(game.accuracy)}%`}</span>
+          <span className="library-slips">{slips.length ? slips.join(', ') : game.moment_count ? `${game.moment_count} key moments` : 'Clean game'}</span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+/** One line per game. Rows are links, so a game opens in a new tab with a middle click. */
+export function GameList({
+  games,
+  loadingRows = 0,
+  onOpen
+}: {
+  games: LibraryGame[];
+  /** Skeleton rows to show after the loaded games (first load or "load more"). */
+  loadingRows?: number;
+  onOpen?: (gameId: string) => void;
+}) {
+  return (
+    <section className="library-list" aria-label="Games">
+      <div className="library-list-head" aria-hidden="true">
+        <span>Result</span>
+        <span>Opponent</span>
+        <span>Opening</span>
+        <span>Accuracy</span>
       </div>
-      <div className="game-list">
-        {analyses.map((item, index) => {
-          const opponent = item.game.player_color === 'white' ? item.game.black : item.game.white;
-          const title = `${item.game.white} vs ${item.game.black}`;
-          const themes = Array.from(new Set(item.moments.map((moment) => moment.theme.replace('_', ' ')))).slice(0, 2);
-          return (
-            <button
-              className={index === activeIndex ? 'active' : ''}
-              key={item.game.game_id}
-              onClick={() => onSelect(index)}
-            >
-              <strong>{title}</strong>
-              <span>{item.game.date} • {resultLabel(item.game.player_result)}{opponent ? ` • vs ${opponent}` : ''}</span>
-              <small>
-                {item.game.player_elo ? `${item.game.player_elo} Elo` : item.game.time_control || 'PGN'}
-                {' · '}
-                {item.moments.length} moments
-                {themes.length ? ` · ${themes.join(', ')}` : ''}
-              </small>
-            </button>
-          );
-        })}
-      </div>
+      <ul>
+        {games.map((game) => <GameRow key={game.game_id} game={game} onOpen={onOpen} />)}
+        {Array.from({ length: loadingRows }, (_, index) => (
+          <li key={`skeleton-${index}`} className="library-skeleton">
+            <Skeleton variant="row" label={index === 0 ? 'Loading games' : 'Loading'} />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

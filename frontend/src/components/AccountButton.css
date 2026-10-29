@@ -1,13 +1,8 @@
-/* Sits at the foot of the sidebar; the sidebar is a column so margin-top pushes it down. */
-.app-sidebar {
-  display: flex;
-  flex-direction: column;
-}
-
+/* Sits in the sidebar footer (desktop and rail) and in the More sheet (phone). */
 .account-box {
   display: grid;
   gap: 6px;
-  margin-top: auto;
+  width: 100%;
   padding-top: 12px;
   border-top: 1px solid var(--gray-800);
   min-height: 44px;
@@ -126,12 +121,44 @@
   }
 }
 
-/* The phone layout turns the sidebar into a bottom tab bar with no room for an account block. */
-@media (max-width: 720px) {
-  .app-sidebar {
-    display: block;
+/* Icon rail (721-1023 px): icon only; the label stays for screen readers. */
+@media (min-width: 721px) and (max-width: 1023px) {
+  .app-sidebar .account-box {
+    justify-items: center;
   }
-  .account-box {
+  .app-sidebar .account-signin,
+  .app-sidebar .account-row {
+    grid-template-columns: 1fr;
+    place-items: center;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  .app-sidebar .account-row {
+    gap: 4px;
+  }
+  .app-sidebar .account-signin span,
+  .app-sidebar .account-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .app-sidebar .account-note,
+  .app-sidebar .account-use {
     display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .account-icon-button {
+    width: 44px;
+    height: 44px;
+  }
+  .account-signin,
+  .account-use {
+    min-height: 44px;
   }
 }

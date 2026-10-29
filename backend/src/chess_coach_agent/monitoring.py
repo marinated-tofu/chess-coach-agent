@@ -40,6 +40,13 @@ def read_events() -> list[dict[str, Any]]:
     return events
 
 
+def _used_llm(event: dict[str, Any]) -> bool:
+    if event.get("used_llm"):
+        return True
+    usage = event.get("usage") or {}
+    return bool(usage.get("input_tokens") or usage.get("output_tokens"))
+
+
 def monitoring_summary() -> dict[str, Any]:
     events = read_events()
     event_counts = Counter(event.get("event_type", "unknown") for event in events)
@@ -49,13 +56,20 @@ def monitoring_summary() -> dict[str, Any]:
     chats = [
         event for event in events if event.get("event_type") in {"chat_completed", "coach_answered"}
     ]
-    llm_chats = [event for event in chats if event.get("used_llm")]
+    # Every model-backed event counts, not only chat answers: coach turns, practice agent runs
+    # and board-image reads (vision_fen) call the model too and log their own usage.
+    llm_events = [event for event in events if _used_llm(event)]
+    usages = [event.get("usage") or {} for event in llm_events]
     helpful = sum(event.get("rating") == "helpful" for event in feedback)
     themes = Counter(event.get("theme") for event in feedback if event.get("theme"))
     tool_usage = Counter(tool for event in chats for tool in event.get("tools_used", []))
-    input_tokens = sum((event.get("usage") or {}).get("input_tokens", 0) for event in chats)
-    output_tokens = sum((event.get("usage") or {}).get("output_tokens", 0) for event in chats)
-    estimated_cost = sum((event.get("usage") or {}).get("estimated_cost_usd", 0) for event in chats)
+    input_tokens = sum(int(usage.get("input_tokens") or 0) for usage in usages)
+    output_tokens = sum(int(usage.get("output_tokens") or 0) for usage in usages)
+    estimated_cost = sum(float(usage.get("estimated_cost_usd") or 0) for usage in usages)
+    # Older events (and some code paths) recorded that the model ran but not what it used.
+    untracked = sum(
+        not (usage.get("input_tokens") or usage.get("output_tokens")) for usage in usages
+    )
     chat_latency = [event.get("duration_ms", 0) for event in chats if event.get("duration_ms") is not None]
     attempts = [event for event in events if event.get("event_type") == "quiz_attempted"]
     training_sessions = [
@@ -78,7 +92,11 @@ def monitoring_summary() -> dict[str, Any]:
         "feedback_count": len(feedback),
         "helpful_rate": round(helpful / len(feedback), 3) if feedback else None,
         "feedback_themes": dict(themes),
-        "llm_calls": len(llm_chats),
+        # A run can make several model requests (tool calls); usage.requests counts them.
+        "llm_calls": sum(int(usage.get("requests") or 1) for usage in usages),
+        "llm_runs": len(llm_events),
+        "llm_runs_without_usage": untracked,
+        "llm_runs_by_event": dict(Counter(event.get("event_type", "unknown") for event in llm_events)),
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "estimated_cost_usd": round(estimated_cost, 8),

@@ -380,3 +380,22 @@
   .insights-table td { padding: 8px 5px; font-size: 13px; }
   .insights-table.wide { display: block; overflow-x: auto; }
 }
+
+.leak-examples {
+  justify-self: center;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--gray-700);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: var(--gray-300);
+  text-underline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .leak-examples:hover {
+    color: var(--gray-950);
+    text-decoration-color: currentColor;
+  }
+}

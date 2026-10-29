@@ -7,7 +7,7 @@
   margin-top: 18px;
   padding: 24px;
   border: 1px solid var(--gray-150);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--gray-0);
 }
 
@@ -37,7 +37,7 @@
 .openings-toggle {
   display: inline-flex;
   padding: 3px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--gray-50);
 }
 
@@ -48,7 +48,7 @@
   min-height: 34px;
   padding: 0 14px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 4px;
   background: transparent;
   color: var(--gray-700);
   font: inherit;
@@ -63,7 +63,7 @@
 .openings-toggle button[aria-pressed='true'] {
   background: var(--gray-0);
   color: var(--gray-950);
-  box-shadow: 0 1px 2px rgb(var(--shadow-rgb) / 0.12);
+  box-shadow: var(--shadow-sm);
 }
 
 .openings-toggle button span {
@@ -170,6 +170,21 @@
 }
 
 .openings-weakness { min-width: 180px; }
+
+.openings-table .openings-actions {
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.openings-actions .ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 13px;
+}
 .openings-muted { color: var(--openings-muted); }
 
 .openings-link {
@@ -272,4 +287,6 @@
 
   .openings-result { min-width: 0; }
   .openings-weakness { grid-column: 1 / -1; min-width: 0; font-size: 13px; }
+  .openings-table .openings-actions { grid-column: 1 / -1; text-align: left; margin-left: -8px; }
+  .openings-actions .ghost { min-height: 40px; }
 }

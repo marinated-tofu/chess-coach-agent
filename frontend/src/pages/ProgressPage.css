@@ -1,0 +1,143 @@
+.progress-metric-label {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress-info {
+  display: inline-grid;
+  place-items: center;
+  color: var(--gray-400);
+  cursor: help;
+}
+
+.progress-info:focus-visible {
+  outline: 2px solid var(--green-500);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+.progress-chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.progress-chart .progress-chart-head h2 { margin: 0; }
+
+.progress-toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+}
+
+.progress-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gray-700);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 160ms ease-out;
+}
+
+.progress-toggle button:active { transform: scale(0.97); }
+
+.progress-toggle button[aria-pressed='true'] {
+  background: var(--gray-0);
+  color: var(--gray-950);
+  box-shadow: var(--shadow-sm);
+}
+
+.progress-toggle button span {
+  color: var(--gray-500);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-chart-note,
+.progress-blindspots-note {
+  margin: 8px 0 0;
+  color: var(--gray-500);
+  font-size: 12px;
+  text-wrap: pretty;
+}
+
+.progress-blindspots-note { margin: -10px 0 12px; }
+
+.progress-tooltip {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-150);
+  border-radius: var(--radius-sm);
+  background: var(--gray-0);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-tooltip strong { font-size: 14px; }
+.progress-tooltip span { color: var(--gray-500); }
+
+.progress-blindspots ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress-blindspots li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--gray-100);
+}
+
+.progress-blindspot-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.progress-blindspot-text small {
+  color: var(--gray-500);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-blindspots li strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-practice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.progress-blindspots > .skeleton-lines {
+  display: grid;
+  padding: 0;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-toggle button { transition: none; }
+}

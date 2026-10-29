@@ -29,10 +29,20 @@ const RANGES = [
   { value: 3000, label: 'All' }
 ];
 
+// SVG presentation attributes read CSS variables, so the charts use the same tokens as the CSS.
 const SEVERITY = {
-  inaccuracy: '#e39a68',
-  mistake: '#c8642c',
-  blunder: '#8f3412'
+  inaccuracy: 'var(--amber-300)',
+  mistake: 'var(--amber-600)',
+  blunder: 'var(--red-600)'
+};
+const CHART = {
+  grid: 'var(--gray-100)',
+  tick: 'var(--gray-600)',
+  tickMuted: 'var(--gray-500)',
+  reference: 'var(--gray-300)',
+  cursor: 'rgb(var(--shadow-rgb) / 0.04)',
+  bar: 'var(--green-500)',
+  barStroke: 'var(--gray-0)'
 };
 
 const PHASE_LABEL: Record<string, string> = {
@@ -99,13 +109,22 @@ function LeakCard({ leak, rank, username, platform }: {
       <p>{leak.detail}</p>
       <div className="leak-action">
         {leak.action.type === 'practice' ? (
-          <button className="primary leak-button" onClick={practice} disabled={starting}>
+          <button className={`${rank === 1 ? 'primary' : 'secondary'} leak-button`} onClick={practice} disabled={starting}>
             {starting ? <Loader2 className="spin" size={16} /> : <ArrowRight size={16} />}
             {leak.action.label}
           </button>
         ) : (
           <Link className="secondary leak-button" to="/progress">
             <ArrowRight size={16} /> {leak.action.label}
+          </Link>
+        )}
+        {leak.action.theme && (
+          <Link
+            className="leak-examples"
+            to="/games"
+            search={{ import: false, theme: leak.action.theme } as { import: boolean }}
+          >
+            See examples
           </Link>
         )}
         {error && <span className="leak-error" role="alert"><AlertCircle size={14} /> {error}</span>}
@@ -151,13 +170,13 @@ function PhaseSection({ data }: { data: InsightsResponse }) {
         <div className="insights-chart" role="img" aria-label="Errors per game by phase, stacked by severity">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%">
-              <CartesianGrid stroke="#edf1ee" vertical={false} />
-              <XAxis dataKey="phase" tickFormatter={(value: string) => PHASE_LABEL[value]} tick={{ fontSize: 12, fill: '#5b6961' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#7a867f" }} axisLine={false} tickLine={false} width={34} tickCount={4} allowDecimals tickFormatter={(value: number) => value.toFixed(1)} />
-              <Tooltip content={<PhaseTooltip />} cursor={{ fill: 'rgba(23, 32, 27, 0.04)' }} />
-              <Bar isAnimationActive={false} dataKey="blunders_per_game" stackId="e" fill={SEVERITY.blunder} stroke="#fff" strokeWidth={2} />
-              <Bar isAnimationActive={false} dataKey="mistakes_per_game" stackId="e" fill={SEVERITY.mistake} stroke="#fff" strokeWidth={2} />
-              <Bar isAnimationActive={false} dataKey="inaccuracies_per_game" stackId="e" fill={SEVERITY.inaccuracy} stroke="#fff" strokeWidth={2} radius={[4, 4, 0, 0]} />
+              <CartesianGrid stroke={CHART.grid} vertical={false} />
+              <XAxis dataKey="phase" tickFormatter={(value: string) => PHASE_LABEL[value]} tick={{ fontSize: 12, fill: CHART.tick }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: CHART.tickMuted }} axisLine={false} tickLine={false} width={34} tickCount={4} allowDecimals tickFormatter={(value: number) => value.toFixed(1)} />
+              <Tooltip content={<PhaseTooltip />} cursor={{ fill: CHART.cursor }} />
+              <Bar isAnimationActive={false} dataKey="blunders_per_game" stackId="e" fill={SEVERITY.blunder} stroke={CHART.barStroke} strokeWidth={2} />
+              <Bar isAnimationActive={false} dataKey="mistakes_per_game" stackId="e" fill={SEVERITY.mistake} stroke={CHART.barStroke} strokeWidth={2} />
+              <Bar isAnimationActive={false} dataKey="inaccuracies_per_game" stackId="e" fill={SEVERITY.inaccuracy} stroke={CHART.barStroke} strokeWidth={2} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           <div className="insights-legend" aria-hidden="true">
@@ -255,16 +274,16 @@ function OpponentSection({ data }: { data: InsightsResponse }) {
       <div className="insights-chart" role="img" aria-label="Score percentage by opponent rating difference">
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={data.opponents.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#edf1ee" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#5b6961' }} axisLine={false} tickLine={false} />
-            <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#7a867f' }} axisLine={false} tickLine={false} width={40} unit="%" />
-            <ReferenceLine y={50} stroke="#b9c4bd" strokeDasharray="3 3" />
+            <CartesianGrid stroke={CHART.grid} vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.tick }} axisLine={false} tickLine={false} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: CHART.tickMuted }} axisLine={false} tickLine={false} width={40} unit="%" />
+            <ReferenceLine y={50} stroke={CHART.reference} strokeDasharray="3 3" />
             <Tooltip
-              cursor={{ fill: 'rgba(23, 32, 27, 0.04)' }}
+              cursor={{ fill: CHART.cursor }}
               formatter={(value) => [`${value}%`, 'Score']}
               labelFormatter={(label) => `Opponent ${String(label)}`}
             />
-            <Bar isAnimationActive={false} dataKey="score_pct" fill="#397c57" radius={[4, 4, 0, 0]} maxBarSize={56} />
+            <Bar isAnimationActive={false} dataKey="score_pct" fill={CHART.bar} radius={[4, 4, 0, 0]} maxBarSize={56} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -348,9 +367,9 @@ export function InsightsPage() {
         eyebrow="Insights"
         title="Where you lose points"
         detail={data
-          ? `${workspace.player}'s last ${count(data.games_considered)} games, ${count(data.engine_games)} with full engine data.`
+          ? `${last >= data.total_games ? 'All' : 'Last'} ${count(Math.min(last, data.total_games))} games (${count(data.engine_games)} with engine data)`
           : `Patterns across ${workspace.player}'s analyzed games.`}
-        actions={
+        actions={data && data.games_considered < min ? undefined : (
           <div className="insights-range" role="group" aria-label="Games to include">
             {RANGES.map((range) => (
               <button
@@ -363,7 +382,7 @@ export function InsightsPage() {
               </button>
             ))}
           </div>
-        }
+        )}
       />
 
       {query.isLoading && <SkeletonPage />}

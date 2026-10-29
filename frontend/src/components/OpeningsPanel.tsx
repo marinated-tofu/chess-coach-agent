@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { Compass, Loader2, Target } from 'lucide-react';
+import { createTrainingSession } from '../lib/api';
+import { getOpeningPosition } from '../lib/libraryApi';
 import { getOpenings, type OpeningColor, type OpeningStat } from '../lib/openingsApi';
 import type { Platform } from '../lib/types';
 import './OpeningsPanel.css';
@@ -14,7 +17,7 @@ function themeLabel(theme: string): string {
 
 function ResultBar({ stat }: { stat: OpeningStat }) {
   const total = stat.wins + stat.draws + stat.losses;
-  const label = `${stat.wins} wins, ${stat.draws} draws, ${stat.losses} losses`;
+  const label = `${stat.wins.toLocaleString()} wins, ${stat.draws.toLocaleString()} draws, ${stat.losses.toLocaleString()} losses`;
   if (!total) return <span className="openings-muted">No results</span>;
   return (
     <div className="openings-result">
@@ -30,7 +33,7 @@ function ResultBar({ stat }: { stat: OpeningStat }) {
         )}
       </div>
       <span className="openings-wdl" aria-hidden="true">
-        {stat.wins}/{stat.draws}/{stat.losses}
+        {stat.wins.toLocaleString()}/{stat.draws.toLocaleString()}/{stat.losses.toLocaleString()}
       </span>
     </div>
   );
@@ -54,6 +57,35 @@ export function OpeningsPanel({ username, platform }: { username: string; platfo
   const navigate = useNavigate();
   const [color, setColor] = useState<OpeningColor>('white');
   const [showAll, setShowAll] = useState(false);
+  const [pending, setPending] = useState('');
+  const [actionError, setActionError] = useState('');
+
+  async function explore(stat: OpeningStat) {
+    setPending(`explore-${stat.name}`);
+    setActionError('');
+    try {
+      const position = await getOpeningPosition(stat.name);
+      await navigate({ to: '/analysis', search: { fen: position.fen } });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not open the explorer');
+    } finally {
+      setPending('');
+    }
+  }
+
+  async function practice(stat: OpeningStat) {
+    if (!stat.top_theme) return;
+    setPending(`practice-${stat.name}`);
+    setActionError('');
+    try {
+      const session = await createTrainingSession(username, platform, stat.top_theme);
+      await navigate({ to: '/practice/$sessionId', params: { sessionId: session.id } });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not start practice');
+    } finally {
+      setPending('');
+    }
+  }
   const openings = useQuery({
     queryKey: ['openings', platform, username],
     queryFn: () => getOpenings(username, platform)
@@ -89,7 +121,7 @@ export function OpeningsPanel({ username, platform }: { username: string; platfo
                 }}
               >
                 As {value === 'white' ? 'White' : 'Black'}
-                {openings.data && <span>{openings.data[value].length}</span>}
+                {openings.data && <span>{openings.data[value].length.toLocaleString()}</span>}
               </button>
             ))}
           </div>
@@ -139,6 +171,7 @@ export function OpeningsPanel({ username, platform }: { username: string; platfo
                   {hasAccuracy && <th scope="col" className="openings-num">Accuracy</th>}
                   <th scope="col">Won / drawn / lost</th>
                   <th scope="col">Most common mistake</th>
+                  <th scope="col"><span className="openings-visually-hidden">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -162,13 +195,38 @@ export function OpeningsPanel({ username, platform }: { username: string; platfo
                     )}
                     <td className="openings-results-cell"><ResultBar stat={stat} /></td>
                     <td className="openings-weakness"><Weakness stat={stat} /></td>
+                    <td className="openings-actions">
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={Boolean(pending)}
+                        onClick={() => void explore(stat)}
+                        aria-label={`Explore ${stat.name} on the analysis board`}
+                      >
+                        {pending === `explore-${stat.name}` ? <Loader2 className="spin" size={14} /> : <Compass size={14} />}
+                        Explore
+                      </button>
+                      {stat.top_theme && (
+                        <button
+                          type="button"
+                          className="ghost"
+                          disabled={Boolean(pending)}
+                          onClick={() => void practice(stat)}
+                          aria-label={`Practice ${themeLabel(stat.top_theme).toLowerCase()} positions`}
+                        >
+                          {pending === `practice-${stat.name}` ? <Loader2 className="spin" size={14} /> : <Target size={14} />}
+                          Practice
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {actionError && <p className="openings-error" role="alert">{actionError}</p>}
             {rows.length > INITIAL_ROWS && (
               <button type="button" className="openings-link openings-more" onClick={() => setShowAll(!showAll)}>
-                {showAll ? 'Show top 10' : `Show all ${rows.length} openings`}
+                {showAll ? 'Show top 10' : `Show all ${rows.length.toLocaleString()} openings`}
               </button>
             )}
           </>

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, BookMarked, Check, ChevronLeft, ChevronsLeft, Loader2, RotateCcw, Trash2, X } from 'lucide-react';
+import { Link, useLocation } from '@tanstack/react-router';
+import { AlertTriangle, BookMarked, Check, ChevronLeft, ChevronsLeft, Loader2, Microscope, RotateCcw, Trash2, X } from 'lucide-react';
 import { ARROW_COLORS, ChessBoard, type BoardArrow } from '../components/ChessBoard';
 import { PageHeader } from '../components/PageHeader';
 import { playMove, type BoardMove } from '../lib/chessRules';
@@ -56,6 +57,33 @@ function resolvePath(tree: RepertoireNode[], ids: string[]): RepertoireNode[] {
   return path;
 }
 
+/** Board, side to move, castling and en passant: the parts that identify a position. */
+function positionKey(fen: string) {
+  return fen.trim().split(/\s+/).slice(0, 4).join(' ');
+}
+
+/** Node ids of the first line in the tree that reaches `fen`, or null. */
+function findPath(tree: RepertoireNode[], fen: string): string[] | null {
+  const target = positionKey(fen);
+  if (positionKey(START_FEN) === target) return [];
+  const seen = new Set<string>();
+  function walk(nodes: RepertoireNode[], before: string, ids: string[]): string[] | null {
+    for (const node of nodes) {
+      const result = playMove(before, { ...squares(node.uci), promotion: node.uci[4] as 'q' | undefined });
+      if (!result) continue;
+      const key = positionKey(result.fen);
+      const path = [...ids, node.id];
+      if (key === target) return path;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const found = walk(node.children, result.fen, path);
+      if (found) return found;
+    }
+    return null;
+  }
+  return walk(tree, START_FEN, []);
+}
+
 function fenAfter(path: RepertoireNode[]) {
   let fen = START_FEN;
   for (const node of path) {
@@ -69,7 +97,18 @@ function fenAfter(path: RepertoireNode[]) {
 export function RepertoirePage() {
   const { player, platform } = useWorkspace();
   const queryClient = useQueryClient();
-  const [color, setColor] = useState<RepertoireColor>('white');
+  // The explorer links here with ?fen=&color= to open that position in the matching repertoire.
+  const linked = useLocation({
+    select: (location) => {
+      const search = location.search as Record<string, unknown>;
+      return {
+        fen: typeof search.fen === 'string' ? search.fen : undefined,
+        color: search.color === 'black' || search.color === 'white' ? (search.color as RepertoireColor) : undefined
+      };
+    },
+    structuralSharing: true
+  });
+  const [color, setColor] = useState<RepertoireColor>(linked.color ?? 'white');
   const [mode, setMode] = useState<Mode>('edit');
   const [seedNote, setSeedNote] = useState<SeedResult | null>(null);
 
@@ -167,7 +206,7 @@ export function RepertoirePage() {
           </button>
         </div>
       ) : rep && mode === 'edit' ? (
-        <EditMode key={rep.id} rep={rep} onChange={storeRepertoire} />
+        <EditMode key={rep.id} rep={rep} onChange={storeRepertoire} targetFen={rep.color === linked.color ? linked.fen : undefined} />
       ) : rep ? (
         <DrillMode key={rep.id} rep={rep} onAnswered={() => queryClient.invalidateQueries({ queryKey: ['repertoire', rep.id] })} />
       ) : null}
@@ -197,8 +236,9 @@ function SeedSummary({ result, onClose }: { result: SeedResult; onClose: () => v
 
 /* ------------------------------------------------------------------ edit mode */
 
-function EditMode({ rep, onChange }: { rep: Repertoire; onChange: (rep: Repertoire) => void }) {
-  const [pathIds, setPathIds] = useState<string[]>([]);
+function EditMode({ rep, onChange, targetFen }: { rep: Repertoire; onChange: (rep: Repertoire) => void; targetFen?: string }) {
+  const [target] = useState(() => (targetFen ? { fen: targetFen, path: findPath(rep.tree, targetFen) } : null));
+  const [pathIds, setPathIds] = useState<string[]>(target?.path ?? []);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const path = useMemo(() => resolvePath(rep.tree, pathIds), [rep.tree, pathIds]);
   const current = path[path.length - 1];
@@ -277,6 +317,11 @@ function EditMode({ rep, onChange }: { rep: Repertoire; onChange: (rep: Repertoi
             )
           )}
         </div>
+        {target && !target.path && (
+          <p className="rep-comment" role="status">
+            That position isn't in your {rep.color} repertoire yet. Play the moves from the start to add the line.
+          </p>
+        )}
         {(add.isError || remove.isError) && (
           <p className="rep-error" role="alert">{((add.error ?? remove.error) as Error).message}</p>
         )}
@@ -479,7 +524,12 @@ function DrillMode({ rep, onAnswered }: { rep: Repertoire; onAnswered: () => voi
             </p>
             {feedback.result.comment && <p className="rep-comment is-fix"><AlertTriangle size={16} aria-hidden="true" />{feedback.result.comment}</p>}
             <p className="rep-drill-note">It comes back later in this session.</p>
-            <button className="primary" type="button" onClick={() => next(true)}>Continue</button>
+            <div className="rep-drill-actions">
+              <button className="primary" type="button" onClick={() => next(true)}>Continue</button>
+              <Link className="secondary" to="/analysis" search={{ fen: item.fen, tab: 'explorer' }}>
+                <Microscope size={16} /> Open in explorer
+              </Link>
+            </div>
           </>
         )}
         {answer.isError && <p className="rep-error" role="alert">{(answer.error as Error).message}</p>}

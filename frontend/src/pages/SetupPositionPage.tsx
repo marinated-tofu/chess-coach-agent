@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { MessageCircle, Microscope } from 'lucide-react';
+import { MessageCircle, Microscope, Swords } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { BoardEditor } from '../components/BoardEditor';
 import { ImageToBoard } from '../components/ImageToBoard';
@@ -24,12 +24,20 @@ export function SetupPositionPage() {
     void navigate({ to: '/analysis', search: { fen } });
   }
 
+  function askCoach() {
+    void navigate({ to: '/analysis', search: { fen, coach: true } });
+  }
+
+  function playFromHere() {
+    void navigate({ to: '/play', search: { fen } });
+  }
+
   return (
     <main className="route-page setup-page">
       <PageHeader
         eyebrow="Set up position"
         title="From a picture or by hand"
-        detail="Read a board from a screenshot or photo, fix anything it got wrong, then analyse it or ask the coach."
+        detail="Read a board from a screenshot or photo, fix anything it got wrong, then analyze it, ask the coach or play it out."
       />
       <div className="setup-layout">
         <div className="setup-card setup-editor">
@@ -40,10 +48,13 @@ export function SetupPositionPage() {
         </div>
         <div className="setup-card setup-go">
           <button type="button" className="primary" disabled={Boolean(error)} onClick={openAnalysis}>
-            <Microscope size={17} aria-hidden /> Open in analysis board
+            <Microscope size={17} aria-hidden /> Analyze
           </button>
-          <button type="button" className="secondary" disabled={Boolean(error)} onClick={openAnalysis}>
+          <button type="button" className="secondary" disabled={Boolean(error)} onClick={askCoach}>
             <MessageCircle size={17} aria-hidden /> Ask the coach
+          </button>
+          <button type="button" className="secondary" disabled={Boolean(error)} onClick={playFromHere}>
+            <Swords size={17} aria-hidden /> Play from here
           </button>
           {error && <p className="setup-blocked">Fix the position first: {error}</p>}
         </div>
