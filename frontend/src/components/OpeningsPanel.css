@@ -1,14 +1,14 @@
 .openings-panel {
-  --openings-win: #397c57;
-  --openings-draw: #a9b4ae;
-  --openings-loss: #c4574f;
-  --openings-line: #e3e9e5;
-  --openings-muted: #66736b;
+  --openings-win: var(--green-500);
+  --openings-draw: var(--gray-300);
+  --openings-loss: var(--red-300);
+  --openings-line: var(--gray-100);
+  --openings-muted: var(--gray-500);
   margin-top: 18px;
   padding: 24px;
-  border: 1px solid #dce4df;
+  border: 1px solid var(--gray-150);
   border-radius: 8px;
-  background: #fff;
+  background: var(--gray-0);
 }
 
 .openings-header {
@@ -38,7 +38,7 @@
   display: inline-flex;
   padding: 3px;
   border-radius: 7px;
-  background: #eef3f0;
+  background: var(--gray-50);
 }
 
 .openings-toggle button {
@@ -50,7 +50,7 @@
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: #3d4a42;
+  color: var(--gray-700);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -61,9 +61,9 @@
 .openings-toggle button:active { transform: scale(0.97); }
 
 .openings-toggle button[aria-pressed='true'] {
-  background: #fff;
-  color: #17201b;
-  box-shadow: 0 1px 2px rgb(23 32 27 / 0.12);
+  background: var(--gray-0);
+  color: var(--gray-950);
+  box-shadow: 0 1px 2px rgb(var(--shadow-rgb) / 0.12);
 }
 
 .openings-toggle button span {
@@ -189,7 +189,7 @@
 
 .openings-error {
   margin: 0;
-  color: #a43832;
+  color: var(--red-500);
 }
 
 .openings-empty {
@@ -221,7 +221,7 @@
   width: 60%;
   height: 12px;
   border-radius: 4px;
-  background: #f3f6f4;
+  background: var(--gray-50);
 }
 
 .openings-visually-hidden {

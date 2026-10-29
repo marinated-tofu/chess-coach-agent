@@ -1,19 +1,19 @@
 .explorer {
-  --explorer-ink: #17201b;
-  --explorer-muted: #66736b;
-  --explorer-line: #e6ece8;
-  --explorer-hover: #f3f7f5;
-  --explorer-win: #397c57;
-  --explorer-draw: #b3bcb7;
-  --explorer-loss: #c4574f;
-  --explorer-white: #f6f5f0;
-  --explorer-black: #2f3531;
+  --explorer-ink: var(--gray-950);
+  --explorer-muted: var(--gray-500);
+  --explorer-line: var(--gray-100);
+  --explorer-hover: var(--gray-50);
+  --explorer-win: var(--green-500);
+  --explorer-draw: var(--gray-300);
+  --explorer-loss: var(--red-300);
+  --explorer-white: var(--gray-50);
+  --explorer-black: var(--gray-800);
   --explorer-ease: cubic-bezier(0.23, 1, 0.32, 1);
   min-width: 0;
   padding: 16px;
   border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 14px 45px rgba(52, 70, 88, 0.11);
+  background: var(--gray-0);
+  box-shadow: var(--shadow-md);
   color: var(--explorer-ink);
 }
 
@@ -37,7 +37,7 @@
   max-width: 100%;
   margin: 0;
   overflow: hidden;
-  color: #33413a;
+  color: var(--gray-800);
   font-size: 13px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -61,7 +61,7 @@
   margin-bottom: 10px;
   padding: 3px;
   border-radius: 7px;
-  background: #eef3f0;
+  background: var(--gray-50);
 }
 
 .explorer-tabs button {
@@ -71,7 +71,7 @@
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: #3d4a42;
+  color: var(--gray-700);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -80,9 +80,9 @@
 }
 
 .explorer-tabs button[aria-selected="true"] {
-  background: #ffffff;
+  background: var(--gray-0);
   color: var(--explorer-ink);
-  box-shadow: 0 1px 3px rgba(23, 32, 27, 0.14);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--gray-950) 14%, transparent);
 }
 
 .explorer-tabs button:active,
@@ -95,7 +95,7 @@
 .explorer-move:focus-visible,
 .explorer-link:focus-visible,
 .explorer-games a:focus-visible {
-  outline: 2px solid #2062c4;
+  outline: 2px solid var(--blue-500);
   outline-offset: 1px;
 }
 
@@ -118,8 +118,8 @@
   padding: 0 10px;
   border: 1px solid var(--explorer-line);
   border-radius: 999px;
-  background: #ffffff;
-  color: #3d4a42;
+  background: var(--gray-0);
+  color: var(--gray-700);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -127,9 +127,9 @@
 }
 
 .explorer-colors button[aria-checked="true"] {
-  border-color: #17201b;
-  background: #17201b;
-  color: #ffffff;
+  border-color: var(--gray-950);
+  background: var(--gray-950);
+  color: var(--gray-0);
 }
 
 /* Table */
@@ -152,7 +152,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #ffffff;
+  background: var(--gray-0);
 }
 
 .explorer-row {
@@ -214,7 +214,7 @@
 }
 
 .explorer-move:active {
-  background: #e9f0ec;
+  background: var(--gray-50);
 }
 
 .explorer-move[data-wrong] {
@@ -258,7 +258,7 @@
   height: 16px;
   overflow: hidden;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(23, 32, 27, 0.08);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gray-950) 8%, transparent);
   font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -273,19 +273,19 @@
   white-space: nowrap;
 }
 
-.explorer-bar-seg.win { background: var(--explorer-win); color: #ffffff; }
-.explorer-bar-seg.draw { background: var(--explorer-draw); color: #26302a; }
-.explorer-bar-seg.loss { background: var(--explorer-loss); color: #ffffff; }
-.explorer-bar-seg.white { background: var(--explorer-white); color: #26302a; }
-.explorer-bar-seg.black { background: var(--explorer-black); color: #ffffff; }
+.explorer-bar-seg.win { background: var(--explorer-win); color: var(--gray-0); }
+.explorer-bar-seg.draw { background: var(--explorer-draw); color: var(--gray-800); }
+.explorer-bar-seg.loss { background: var(--explorer-loss); color: var(--gray-0); }
+.explorer-bar-seg.white { background: var(--explorer-white); color: var(--gray-800); }
+.explorer-bar-seg.black { background: var(--explorer-black); color: var(--gray-0); }
 
 .explorer-warning {
   margin: 0 0 8px;
   padding: 8px 10px;
   border-left: 3px solid var(--explorer-loss);
   border-radius: 0 6px 6px 0;
-  background: #fbefee;
-  color: #5b2622;
+  background: var(--red-50);
+  color: var(--red-800);
   font-size: 13px;
   line-height: 1.45;
   text-wrap: pretty;
@@ -309,7 +309,7 @@
 
 .explorer-empty p {
   margin: 0;
-  color: #3d4a42;
+  color: var(--gray-700);
   font-size: 13px;
   line-height: 1.45;
   text-wrap: pretty;
@@ -319,7 +319,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #1d5fb8;
+  color: var(--blue-500);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -334,7 +334,7 @@
   display: block;
   height: 10px;
   border-radius: 4px;
-  background: #edf1ef;
+  background: var(--gray-50);
   animation: explorer-pulse 1.2s ease-in-out infinite;
 }
 
@@ -399,14 +399,14 @@
   min-width: 34px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: #eef3f0;
+  background: var(--gray-50);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   text-align: center;
 }
 
-.explorer-result.white { background: var(--explorer-white); box-shadow: inset 0 0 0 1px #d9ddd8; }
-.explorer-result.black { background: var(--explorer-black); color: #ffffff; }
+.explorer-result.white { background: var(--explorer-white); box-shadow: inset 0 0 0 1px var(--gray-150); }
+.explorer-result.black { background: var(--explorer-black); color: var(--gray-0); }
 
 .explorer-games .explorer-num {
   text-align: right;

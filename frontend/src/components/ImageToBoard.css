@@ -10,19 +10,19 @@
   justify-items: start;
   gap: 12px;
   padding: 16px;
-  border: 1.5px dashed #b8c6d4;
+  border: 1.5px dashed var(--gray-200);
   border-radius: 8px;
-  background: #f7f9fb;
+  background: var(--gray-25);
   transition: border-color 150ms ease, background-color 150ms ease;
 }
 
 .itb-drop[data-dragging] {
-  border-color: #198754;
-  background: #e8f5ee;
+  border-color: var(--green-500);
+  background: var(--green-50);
 }
 
 .itb-icon {
-  color: #5b6875;
+  color: var(--gray-600);
 }
 
 .itb-preview {
@@ -31,7 +31,7 @@
   max-height: 240px;
   object-fit: contain;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--gray-0);
 }
 
 .itb-drop[data-busy] .itb-preview {
@@ -45,7 +45,7 @@
 }
 
 .itb-copy span {
-  color: #5b6875;
+  color: var(--gray-600);
   font-size: 14px;
   text-wrap: pretty;
 }
@@ -76,17 +76,17 @@
 }
 
 .itb-ok {
-  color: #126b42;
+  color: var(--green-600);
 }
 
 .itb-warn,
 .itb-error {
-  color: #b4262e;
+  color: var(--red-500);
 }
 
 .itb-warnings {
   margin: 8px 0 0;
   padding-left: 20px;
-  color: #5b6875;
+  color: var(--gray-600);
   font-size: 13px;
 }

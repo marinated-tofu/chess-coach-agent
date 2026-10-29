@@ -7,9 +7,9 @@
 }
 
 .coach-head-actions .icon-button[aria-pressed='true'] {
-  border-color: #198754;
-  color: #146c43;
-  background: #eef8f2;
+  border-color: var(--green-500);
+  color: var(--green-600);
+  background: var(--gray-50);
 }
 
 .coach-board-notes {
@@ -29,23 +29,23 @@
 
 .coach-board-notes li {
   padding: 2px 8px;
-  border: 1px solid #dde5eb;
+  border: 1px solid var(--gray-100);
   border-radius: 999px;
-  color: #1e2935;
-  background: #fff;
+  color: var(--gray-900);
+  background: var(--gray-0);
 }
 
 .coach-board-notes li span {
-  color: #6b7782;
+  color: var(--gray-500);
 }
 
 .coach-board-notes li[data-kind='best'] {
-  border-color: #a7d7bd;
+  border-color: var(--green-200);
 }
 
 .coach-board-notes li[data-kind='threat'],
 .coach-board-notes li[data-kind='weakness'] {
-  border-color: #efb7ba;
+  border-color: var(--red-200);
 }
 
 .coach-actions {
@@ -63,10 +63,10 @@
   gap: 6px;
   min-height: 32px;
   padding: 4px 10px;
-  border: 1px solid #cfd9e4;
+  border: 1px solid var(--gray-150);
   border-radius: 999px;
-  color: #1e2935;
-  background: #fff;
+  color: var(--gray-900);
+  background: var(--gray-0);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -86,7 +86,7 @@
   height: 32px;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #5b6672;
+  color: var(--gray-600);
   background: transparent;
   cursor: pointer;
 }
@@ -100,13 +100,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #146c43;
+  color: var(--green-600);
   font-size: 13px;
   font-weight: 700;
 }
 
 .coach-rate-error {
-  color: #b4262e;
+  color: var(--red-500);
   font-size: 13px;
 }
 
@@ -117,14 +117,14 @@
 }
 
 .coach-mic.listening {
-  border-color: #b4262e;
-  color: #fff;
-  background: #b4262e;
+  border-color: var(--red-500);
+  color: var(--gray-0);
+  background: var(--red-500);
 }
 
 .coach-listening {
   margin: 8px 0 0;
-  color: #b4262e;
+  color: var(--red-500);
   font-size: 14px;
 }
 
@@ -140,13 +140,13 @@
 
 @media (hover: hover) and (pointer: fine) {
   .coach-chip:hover {
-    border-color: #9fb1c2;
+    border-color: var(--gray-300);
   }
 
   .coach-rate:not(:disabled):hover {
-    border-color: #dde5eb;
-    color: #1e2935;
-    background: #fff;
+    border-color: var(--gray-100);
+    color: var(--gray-900);
+    background: var(--gray-0);
   }
 }
 

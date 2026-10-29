@@ -1,11 +1,11 @@
 /* Opening repertoire: color/mode toggles, board + move tree, drill panel. */
 
 .repertoire-page {
-  --rep-you: #15784b;
-  --rep-them: #2062c4;
-  --rep-fix: #b4262e;
-  --rep-muted: #61707d;
-  --rep-line: #dde5ec;
+  --rep-you: var(--green-500);
+  --rep-them: var(--blue-500);
+  --rep-fix: var(--red-500);
+  --rep-muted: var(--gray-500);
+  --rep-line: var(--gray-100);
 }
 
 .rep-toolbar {
@@ -18,9 +18,9 @@
 .rep-segmented {
   display: inline-flex;
   padding: 3px;
-  border: 1px solid #cfd9e4;
+  border: 1px solid var(--gray-150);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--gray-0);
 }
 
 .rep-segmented button {
@@ -31,7 +31,7 @@
   padding: 6px 14px;
   border: 0;
   border-radius: 6px;
-  color: #3c4a57;
+  color: var(--gray-700);
   background: transparent;
   font-weight: 700;
   cursor: pointer;
@@ -43,25 +43,25 @@
 }
 
 .rep-segmented button[aria-pressed='true'] {
-  color: #ffffff;
-  background: #1e2935;
+  color: var(--gray-0);
+  background: var(--gray-900);
 }
 
 .rep-swatch {
   width: 12px;
   height: 12px;
-  border: 1px solid #8a96a2;
+  border: 1px solid var(--gray-400);
   border-radius: 3px;
 }
 
-.rep-swatch.white { background: #f6f6f2; }
-.rep-swatch.black { background: #2b2f2d; }
+.rep-swatch.white { background: var(--gray-50); }
+.rep-swatch.black { background: var(--gray-800); }
 
 .rep-badge {
   min-width: 22px;
   padding: 1px 7px;
   border-radius: 999px;
-  color: #ffffff;
+  color: var(--gray-0);
   background: var(--rep-fix);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -75,9 +75,9 @@
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px 14px;
-  border: 1px solid #b9dcc8;
+  border: 1px solid var(--green-200);
   border-radius: 8px;
-  background: #eef8f2;
+  background: var(--gray-50);
   text-wrap: pretty;
 }
 
@@ -121,7 +121,7 @@
 .rep-skeleton div {
   min-height: 420px;
   border-radius: 8px;
-  background: #e3eaf0;
+  background: var(--gray-100);
 }
 
 .rep-workspace {
@@ -137,8 +137,8 @@
   min-width: 0;
   padding: 20px;
   border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 14px 45px rgba(52, 70, 88, 0.11);
+  background: var(--gray-0);
+  box-shadow: var(--shadow-md);
 }
 
 .rep-board-column {
@@ -183,7 +183,7 @@
   padding: 10px 14px;
   border: 0;
   border-radius: 8px;
-  color: #ffffff;
+  color: var(--gray-0);
   background: var(--rep-fix);
   font-weight: 700;
   cursor: pointer;
@@ -196,13 +196,13 @@
   margin: 0;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #f3f6f9;
+  background: var(--gray-25);
   text-wrap: pretty;
 }
 
 .rep-comment.is-fix {
-  color: #6d1c21;
-  background: #fbeeee;
+  color: var(--red-700);
+  background: var(--red-50);
 }
 
 .rep-comment svg { flex: 0 0 auto; margin-top: 2px; }
@@ -282,12 +282,12 @@
 .rep-move.fixed { color: var(--rep-fix); }
 
 @media (hover: hover) and (pointer: fine) {
-  .rep-move:hover { background: #eef3f7; }
+  .rep-move:hover { background: var(--gray-50); }
 }
 
 .rep-move.active {
-  color: #ffffff;
-  background: #1e2935;
+  color: var(--gray-0);
+  background: var(--gray-900);
 }
 
 .rep-transpose {
@@ -300,7 +300,7 @@
 .rep-inline-comment {
   flex-basis: 100%;
   padding: 2px 6px 4px;
-  color: #6d1c21;
+  color: var(--red-700);
   font-size: 13px;
   text-wrap: pretty;
 }
@@ -321,7 +321,7 @@
 
 .rep-progress-count {
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .rep-progress-track {
@@ -329,7 +329,7 @@
   height: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e3eaf0;
+  background: var(--gray-100);
 }
 
 .rep-progress-track div {
@@ -352,7 +352,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .rep-verdict.good { color: var(--rep-you); }

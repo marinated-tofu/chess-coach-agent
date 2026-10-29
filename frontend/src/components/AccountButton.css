@@ -9,7 +9,7 @@
   gap: 6px;
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid #304039;
+  border-top: 1px solid var(--gray-800);
   min-height: 44px;
 }
 
@@ -27,8 +27,8 @@
 }
 
 .account-signin {
-  color: #dfe9e3;
-  background: #223129;
+  color: var(--gray-100);
+  background: var(--gray-900);
   transition: background-color 150ms ease, transform 160ms ease-out;
 }
 
@@ -37,7 +37,7 @@
 }
 
 .account-row {
-  color: #ffffff;
+  color: var(--gray-0);
   padding-right: 4px;
 }
 
@@ -52,7 +52,7 @@
 .account-use {
   border: 0;
   border-radius: 6px;
-  color: #aebdb5;
+  color: var(--gray-300);
   background: transparent;
   cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease, transform 160ms ease-out;
@@ -71,7 +71,7 @@
   text-align: left;
   font-size: 12px;
   font-weight: 750;
-  color: #8fd3ad;
+  color: var(--green-300);
 }
 
 .account-icon-button:active,
@@ -87,7 +87,7 @@
 .account-signin:focus-visible,
 .account-icon-button:focus-visible,
 .account-use:focus-visible {
-  outline: 2px solid #8fd3ad;
+  outline: 2px solid var(--green-300);
   outline-offset: 2px;
 }
 
@@ -95,22 +95,22 @@
   .account-signin:hover,
   .account-use:hover,
   .account-icon-button:hover {
-    color: #ffffff;
-    background: #2a3b32;
+    color: var(--gray-0);
+    background: var(--gray-800);
   }
 }
 
 .account-note {
   margin: 0;
   padding: 0 11px;
-  color: #7f9188;
+  color: var(--gray-400);
   font-size: 11.5px;
   line-height: 1.4;
   text-wrap: pretty;
 }
 
 .account-note.error {
-  color: #f2a7a0;
+  color: var(--red-200);
 }
 
 @media (prefers-reduced-motion: reduce) {

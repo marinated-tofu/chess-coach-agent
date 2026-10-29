@@ -1,0 +1,102 @@
+/*
+ * Design tokens. Every stylesheet reads colors from these ramps, so a palette change happens here.
+ * The default palette is "study": warm paper neutrals, forest green, brass for active markers.
+ * `<html data-theme="classic">` restores the original cool grey and Bootstrap green look.
+ */
+:root {
+  --gray-0: #ffffff;
+  --gray-25: #fbfaf7;
+  --gray-50: #f5f3ee;
+  --gray-100: #ece9e1;
+  --gray-150: #e2ded4;
+  --gray-200: #d4cfc3;
+  --gray-300: #b9b4a8;
+  --gray-400: #9a978d;
+  --gray-500: #78786f;
+  --gray-600: #5d625c;
+  --gray-700: #454b46;
+  --gray-800: #2e3430;
+  --gray-900: #1f2622;
+  --gray-950: #141a17;
+
+  --green-50: #eef5f0;
+  --green-100: #dcebe1;
+  --green-200: #b9d7c4;
+  --green-300: #8ec0a2;
+  --green-500: #1f7a4f;
+  --green-600: #19663f;
+  --green-700: #134e31;
+  --green-800: #0f3b26;
+
+  --red-50: #fcf0ee;
+  --red-100: #f8dcd8;
+  --red-200: #efb5ad;
+  --red-300: #d9776c;
+  --red-500: #b4322a;
+  --red-600: #9a2620;
+  --red-700: #7a1d18;
+  --red-800: #5b1612;
+
+  --blue-50: #edf3fb;
+  --blue-100: #dbe6f6;
+  --blue-200: #b4cbec;
+  --blue-300: #7fa6dc;
+  --blue-500: #2d63b0;
+  --blue-600: #22508f;
+  --blue-700: #1b3f70;
+  --blue-800: #13294a;
+
+  --amber-50: #fdf6e7;
+  --amber-100: #fbeac6;
+  --amber-200: #f3d08a;
+  --amber-300: #e3ad4f;
+  --amber-500: #c7861b;
+  --amber-600: #a86a12;
+  --amber-700: #85520f;
+  --amber-800: #5f3a0a;
+
+  /* Shadows are tinted with the ink color rather than a cold blue-grey. */
+  --shadow-rgb: 31 38 34;
+  --shadow-sm: 0 1px 2px rgb(var(--shadow-rgb) / 0.06);
+  --shadow-md: 0 1px 2px rgb(var(--shadow-rgb) / 0.05), 0 6px 18px rgb(var(--shadow-rgb) / 0.07);
+
+  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: Newsreader, "Iowan Old Style", Georgia, serif;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Brass marks the current item: active nav entry, current move. */
+  --marker: var(--amber-500);
+}
+
+:root[data-theme="classic"] {
+  --gray-0: #ffffff;
+  --gray-25: #f8fafb;
+  --gray-50: #eef3f7;
+  --gray-100: #e2e8ee;
+  --gray-150: #dce4df;
+  --gray-200: #cfd9e4;
+  --gray-300: #b3bcb7;
+  --gray-400: #8a96a2;
+  --gray-500: #6b7782;
+  --gray-600: #5b6875;
+  --gray-700: #3d4a42;
+  --gray-800: #27313a;
+  --gray-900: #1e2935;
+  --gray-950: #17201b;
+
+  --green-50: #eef8f2;
+  --green-100: #e3f4ec;
+  --green-200: #b9dcc8;
+  --green-300: #8fd3ad;
+  --green-500: #198754;
+  --green-600: #146c43;
+  --green-700: #1f5a3d;
+  --green-800: #18231d;
+
+  --shadow-rgb: 52 70 88;
+  --font-display: var(--font-ui);
+  --marker: var(--green-500);
+}
