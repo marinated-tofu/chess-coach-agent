@@ -5,7 +5,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +18,15 @@ from .models import (
 )
 from .monitoring import log_event, monitoring_summary
 from .adaptive_api import router as adaptive_router
+from .openings_api import router as openings_router
+from .engine_api import router as engine_router
+from .bots_api import router as bots_router
+from .insights_api import router as insights_router
+from .vision_api import router as vision_router
+from .auth_api import router as auth_router
+from .export_api import router as export_router
+from .explorer_api import router as explorer_router
+from .repertoire_api import router as repertoire_router
 from .db import init_db, session_scope
 from .repositories import persist_analyses
 
@@ -31,6 +40,15 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Chess Coach Agent API", version="0.2.0", lifespan=lifespan)
 agent = ChessCoachAgent()
 app.include_router(adaptive_router)
+app.include_router(openings_router)
+app.include_router(engine_router)
+app.include_router(bots_router)
+app.include_router(insights_router)
+app.include_router(vision_router)
+app.include_router(auth_router)
+app.include_router(export_router)
+app.include_router(explorer_router)
+app.include_router(repertoire_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,6 +74,8 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
     log_event("analysis_requested", {"player": request.player, "max_games": request.max_games})
     started = time.perf_counter()
     response = agent.import_pgn_text(request.pgn, player=request.player, max_games=request.max_games)
+    if not response.analyses:
+        raise HTTPException(422, "No games with moves were found in the pasted PGN.")
     with session_scope() as session:
         persist_analyses(session, request.platform, request.player, response)
     log_event(

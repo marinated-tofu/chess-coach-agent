@@ -1,0 +1,466 @@
+/* Analysis board: board + eval bar, engine lines, move tree, play vs computer. */
+
+.analysis-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 20px;
+  align-items: start;
+}
+
+.analysis-board-column {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 45px rgba(52, 70, 88, 0.11);
+}
+
+.analysis-board-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.analysis-board-row .cb-board {
+  width: min(calc(100% - 24px), 620px);
+}
+
+/* Eval bar: White's share fills from White's side; only transform animates. */
+.analysis-evalbar {
+  position: relative;
+  flex: 0 0 14px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #3a3f3c;
+}
+
+.analysis-evalbar-fill {
+  position: absolute;
+  inset: 0;
+  background: #f4f4f1;
+  transform-origin: bottom;
+  transition: transform 200ms ease-out;
+}
+
+.analysis-evalbar.flipped .analysis-evalbar-fill {
+  transform-origin: top;
+}
+
+.analysis-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.analysis-nav .secondary.icon,
+.analysis-fen-current .secondary.icon {
+  width: 42px;
+  padding: 0;
+}
+
+.analysis-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #eef6f1;
+  color: #1f5a3d;
+}
+
+.analysis-result .text-action {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.analysis-side {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.analysis-card {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 45px rgba(52, 70, 88, 0.11);
+}
+
+.analysis-card h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  text-wrap: balance;
+}
+
+.analysis-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.analysis-card-head h2 {
+  margin: 0;
+}
+
+.analysis-card-head .secondary {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.analysis-depth {
+  color: #61707d;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #61707d;
+  font-size: 14px;
+  text-wrap: pretty;
+}
+
+.analysis-error {
+  margin: 8px 0 0;
+  color: #b4262e;
+  font-size: 14px;
+}
+
+/* Engine switch */
+.analysis-switch {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.analysis-switch input {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: #cfd9e4;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.analysis-switch input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 160ms ease-out;
+}
+
+.analysis-switch input:checked {
+  background: #198754;
+}
+
+.analysis-switch input:checked::after {
+  transform: translateX(16px);
+}
+
+.analysis-switch input:focus-visible {
+  outline: 2px solid #2062c4;
+  outline-offset: 2px;
+}
+
+.analysis-engine-body[data-stale] .analysis-lines {
+  opacity: 0.55;
+}
+
+.analysis-lines button:disabled {
+  cursor: progress;
+}
+
+.analysis-eval {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-lines {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-lines button {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e2e8ee;
+  border-radius: 6px;
+  background: #f8faf9;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease-out;
+}
+
+.analysis-lines button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.analysis-line-eval {
+  flex: 0 0 48px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-line-moves {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #36424d;
+}
+
+/* Move tree */
+.analysis-movelist {
+  max-height: 280px;
+  overflow-y: auto;
+  line-height: 1.9;
+  font-size: 14px;
+}
+
+.analysis-move {
+  display: inline-flex;
+  gap: 3px;
+  margin: 0 2px 0 0;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.analysis-move-number {
+  color: #61707d;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-move[aria-current='true'] {
+  background: #198754;
+  color: #ffffff;
+}
+
+.analysis-move[aria-current='true'] .analysis-move-number {
+  color: #e6f3ec;
+}
+
+.analysis-variations {
+  display: grid;
+  margin: 2px 0 4px 12px;
+  padding-left: 10px;
+  border-left: 2px solid #dce4df;
+}
+
+.analysis-variation {
+  color: #46525d;
+}
+
+.analysis-variation .analysis-move {
+  font-weight: 500;
+}
+
+/* Play vs computer */
+.analysis-play-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.analysis-segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid #cfd9e4;
+  border-radius: 8px;
+  background: #f4f7f9;
+}
+
+.analysis-segmented button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #36424d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 160ms ease-out;
+}
+
+.analysis-segmented button:active {
+  transform: scale(0.97);
+}
+
+.analysis-segmented button[aria-checked='true'] {
+  background: #ffffff;
+  color: #17201b;
+  box-shadow: 0 1px 3px rgba(23, 32, 27, 0.15);
+}
+
+.analysis-level {
+  display: grid;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.analysis-level select {
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid #cfd9e4;
+  border-radius: 8px;
+  background: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-play-options .primary {
+  min-height: 42px;
+  padding: 0 16px;
+  box-shadow: none;
+}
+
+.analysis-play-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+
+.analysis-play .analysis-card-head h2 {
+  text-transform: none;
+}
+
+/* FEN tools */
+.analysis-fen-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.analysis-fen-current code {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f4f7f9;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.analysis-fen-form {
+  display: flex;
+  gap: 8px;
+}
+
+.analysis-fen-form input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid #cfd9e4;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.analysis-fen-form input[aria-invalid='true'] {
+  border-color: #b4262e;
+}
+
+.analysis-page .coach-panel {
+  margin-top: 24px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .analysis-lines button:not(:disabled):hover,
+  .analysis-move:not([aria-current='true']):hover {
+    background: #edf1f4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analysis-evalbar-fill,
+  .analysis-switch input::after,
+  .analysis-lines button,
+  .analysis-segmented button {
+    transition: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .analysis-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  /* The bottom tab bar is a 4-column grid; give every link one column so a fifth fits on one row. */
+  .app-sidebar nav {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .analysis-page {
+    padding: 14px;
+  }
+  .analysis-board-column {
+    padding: 10px;
+  }
+  .analysis-board-row {
+    gap: 6px;
+  }
+  .analysis-evalbar {
+    flex-basis: 10px;
+  }
+}

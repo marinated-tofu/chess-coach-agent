@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile.backend
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-haiku-5.5}
       - DATABASE_URL=postgresql+psycopg://chess_coach:chess_coach@db:5432/chess_coach
       - ENABLE_LOCAL_EMBEDDINGS=${ENABLE_LOCAL_EMBEDDINGS:-false}
     ports:
@@ -30,6 +30,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    environment:
+      - VITE_API_PROXY_TARGET=http://backend:8000
     ports:
       - "5173:5173"
     depends_on:

@@ -1,0 +1,137 @@
+/* Sits at the foot of the sidebar; the sidebar is a column so margin-top pushes it down. */
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+.account-box {
+  display: grid;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #304039;
+  min-height: 44px;
+}
+
+.account-signin,
+.account-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 8px 11px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.account-signin {
+  color: #dfe9e3;
+  background: #223129;
+  transition: background-color 150ms ease, transform 160ms ease-out;
+}
+
+.account-signin:active {
+  transform: scale(0.97);
+}
+
+.account-row {
+  color: #ffffff;
+  padding-right: 4px;
+}
+
+.account-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-icon-button,
+.account-use {
+  border: 0;
+  border-radius: 6px;
+  color: #aebdb5;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, transform 160ms ease-out;
+}
+
+.account-icon-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+}
+
+.account-use {
+  min-height: 34px;
+  padding: 6px 11px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 750;
+  color: #8fd3ad;
+}
+
+.account-icon-button:active,
+.account-use:active {
+  transform: scale(0.97);
+}
+
+.account-icon-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.account-signin:focus-visible,
+.account-icon-button:focus-visible,
+.account-use:focus-visible {
+  outline: 2px solid #8fd3ad;
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .account-signin:hover,
+  .account-use:hover,
+  .account-icon-button:hover {
+    color: #ffffff;
+    background: #2a3b32;
+  }
+}
+
+.account-note {
+  margin: 0;
+  padding: 0 11px;
+  color: #7f9188;
+  font-size: 11.5px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.account-note.error {
+  color: #f2a7a0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-signin,
+  .account-icon-button,
+  .account-use {
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+  .account-signin:active,
+  .account-icon-button:active,
+  .account-use:active {
+    transform: none;
+  }
+}
+
+/* The phone layout turns the sidebar into a bottom tab bar with no room for an account block. */
+@media (max-width: 720px) {
+  .app-sidebar {
+    display: block;
+  }
+  .account-box {
+    display: none;
+  }
+}

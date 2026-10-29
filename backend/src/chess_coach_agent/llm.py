@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from dataclasses import dataclass, field
 from textwrap import dedent
@@ -10,12 +11,14 @@ import httpx
 import logfire
 from dotenv import load_dotenv
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.messages import ModelMessagesTypeAdapter
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.openai import OpenAIProvider
 
+from .annotations import apply_annotations
 from .engine import EngineAnalyzer
 from .knowledge import retrieve_notes
-from .models import CoachAnalysis, CoachPanel, CoachingOutput
+from .models import CoachAnalysis, CoachAskResponse, CoachPanel, CoachingOutput
 from .coach_tools import (
     build_training_session,
     compare_moves,
@@ -27,6 +30,8 @@ from .coach_tools import (
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_URL = f"{OPENROUTER_BASE_URL}/chat/completions"
+# Fastest model in our tool-calling latency check that still grounds answers in tool calls.
+DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
 
 load_dotenv()
 logfire.configure(
@@ -53,7 +58,13 @@ class CoachDependencies:
 
 
 def _model_name() -> str:
-    return os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    return os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
+
+
+def estimate_cost(input_tokens: int, output_tokens: int) -> float:
+    input_rate = float(os.getenv("OPENROUTER_INPUT_COST_PER_MILLION", "0.10"))
+    output_rate = float(os.getenv("OPENROUTER_OUTPUT_COST_PER_MILLION", "0.50"))
+    return round((input_tokens * input_rate + output_tokens * output_rate) / 1_000_000, 8)
 
 
 def _openrouter_model() -> OpenAIChatModel | None:
@@ -61,7 +72,11 @@ def _openrouter_model() -> OpenAIChatModel | None:
     if not api_key:
         return None
     provider = OpenAIProvider(base_url=OPENROUTER_BASE_URL, api_key=api_key)
-    return OpenAIChatModel(_model_name(), provider=provider)  # type: ignore[arg-type]
+    settings = OpenAIChatModelSettings(
+        timeout=float(os.getenv("OPENROUTER_TIMEOUT_SECONDS", "30")),
+        extra_body={"provider": {"sort": "throughput"}},
+    )
+    return OpenAIChatModel(_model_name(), provider=provider, settings=settings)  # type: ignore[arg-type]
 
 
 def search_chess_principles(ctx: RunContext[CoachDependencies], query: str) -> list[dict[str, Any]]:
@@ -142,17 +157,23 @@ COACH_INSTRUCTIONS = dedent(
     reusable lesson. Give one manageable drill. When the user asks to practice, create a position
     quiz or training session from their stored games. Use saved-game tools instead of inventing
     positions. Return the requested structured coaching object.
+    You may add `arrows` and `highlights` for the position on the player's board (the FEN in
+    the context). Arrows of kind best, played, or threat must be legal moves in that FEN; illegal
+    ones are removed before the player sees them. Use at most 4 arrows and 4 highlights, and
+    leave both empty when the answer is not about that position.
     """
 ).strip()
 
 
-def create_coach_agent(model: Any = None) -> Agent[CoachDependencies, CoachingOutput]:
+def create_coach_agent(
+    model: Any = None, instructions: str | None = None
+) -> Agent[CoachDependencies, CoachingOutput]:
     selected_model = model if model is not None else _openrouter_model()
     return Agent(
         selected_model,
         deps_type=CoachDependencies,
         output_type=CoachingOutput,
-        instructions=COACH_INSTRUCTIONS,
+        instructions=instructions or COACH_INSTRUCTIONS,
         tools=[
             search_chess_principles,
             inspect_critical_moments,
@@ -165,6 +186,137 @@ def create_coach_agent(model: Any = None) -> Agent[CoachDependencies, CoachingOu
             build_training_session,
         ],
         retries=1,
+    )
+
+
+def _coach_prompt(
+    question: str, analysis: CoachAnalysis | None, fen: str | None, memory_context: str
+) -> str:
+    sections = [f"Question:\n{question}"]
+    if analysis:
+        moments = "\n".join(
+            f"- move {moment.move_number}: played {moment.played_san}; candidate "
+            f"{moment.best_san or 'unknown'}; theme {moment.theme}; FEN {moment.fen_before}"
+            for moment in analysis.moments[:4]
+        )
+        sections.append(
+            f"Selected game: {analysis.game.white} vs {analysis.game.black} "
+            f"(game id {analysis.game.game_id}), player result {analysis.game.player_result}\n"
+            f"Critical moments:\n{moments or '- none detected'}"
+        )
+    if fen:
+        sections.append(f"Position on the player's board (FEN): {fen}")
+    if memory_context:
+        sections.append(f"Verified player memory:\n{memory_context}")
+    return "\n\n".join(sections)
+
+
+def _fallback_coaching(
+    question: str, analysis: CoachAnalysis | None, fen: str | None = None
+) -> CoachingOutput:
+    notes = retrieve_notes(question, top_k=1)
+    principle = notes[0].snippet if notes else "Start with checks, captures, and threats."
+    if analysis and analysis.moments:
+        # Prefer the moment on the player's board over the game's first mistake.
+        moment = next(
+            (m for m in analysis.moments if fen and m.fen_before.split()[:4] == fen.split()[:4]),
+            analysis.moments[0],
+        )
+        return CoachingOutput(
+            answer=(
+                f"The coach model is unavailable, so here is the engine-backed lesson: around move "
+                f"{moment.move_number} you played {moment.played_san}; "
+                f"{moment.best_san or 'the engine candidate'} was stronger "
+                f"(**{moment.theme.replace('_', ' ')}**)."
+            ),
+            evidence=[moment.summary],
+            recommended_move=moment.best_san,
+            principle=moment.principle,
+            drill=moment.drill_prompt,
+            confidence=0.5,
+        )
+    return CoachingOutput(
+        answer="The coach model is unavailable right now. Open a game so I can point at your own positions.",
+        evidence=[principle],
+        principle=principle,
+        drill="Solve five positions and list every check, capture, and threat before choosing a move.",
+        confidence=0.3,
+    )
+
+
+async def ask_coach(
+    question: str,
+    analysis: CoachAnalysis | None,
+    *,
+    fen: str | None = None,
+    platform: str | None = None,
+    username: str | None = None,
+    memory_context: str = "",
+    message_history: list[dict[str, Any]] | None = None,
+    model: Any = None,
+    instructions: str | None = None,
+) -> CoachAskResponse:
+    selected_model = model if model is not None else _openrouter_model()
+    if selected_model is None:
+        coaching = _fallback_coaching(question, analysis, fen)
+        return _annotated(
+            CoachAskResponse(
+                answer=coaching.answer,
+                coaching=coaching,
+                used_llm=False,
+                fallback_reason="no_api_key",
+            ),
+            fen,
+        )
+
+    deps = CoachDependencies(analysis=analysis, platform=platform, username=username)
+    history = ModelMessagesTypeAdapter.validate_python(message_history) if message_history else None
+    try:
+        with logfire.span("coach_ask", model=_model_name(), has_analysis=analysis is not None):
+            result = await asyncio.wait_for(
+                create_coach_agent(selected_model, instructions).run(
+                    _coach_prompt(question, analysis, fen, memory_context),
+                    deps=deps,
+                    message_history=history,
+                ),
+                timeout=float(os.getenv("COACH_TIMEOUT_SECONDS", "60")),
+            )
+    except Exception as exc:
+        reason = f"{type(exc).__name__}: {exc}"[:300]
+        logfire.warn("coach_ask_failed", error=reason)
+        coaching = _fallback_coaching(question, analysis, fen)
+        return _annotated(
+            CoachAskResponse(
+                answer=coaching.answer, coaching=coaching, used_llm=False, fallback_reason=reason
+            ),
+            fen,
+        )
+
+    response = CoachAskResponse(
+        answer=result.output.answer,
+        coaching=result.output,
+        used_llm=True,
+        tools_used=list(dict.fromkeys(deps.tools_used)),
+        retrieved_notes=list(dict.fromkeys(deps.retrieved_titles)),
+        message_history=ModelMessagesTypeAdapter.dump_python(result.all_messages(), mode="json"),
+        input_tokens=result.usage.input_tokens,
+        output_tokens=result.usage.output_tokens,
+    )
+    return _annotated(response, fen)
+
+
+def _annotated(response: CoachAskResponse, fen: str | None) -> CoachAskResponse:
+    """Keep only board arrows and highlights that python-chess confirms for the FEN."""
+    coaching, dropped = apply_annotations(response.coaching, fen)
+    if dropped:
+        logfire.info("coach_annotations_dropped", dropped=dropped)
+    return response.model_copy(
+        update={
+            "coaching": coaching,
+            "arrows": coaching.arrows,
+            "highlights": coaching.highlights,
+            "annotations_dropped": dropped,
+        }
     )
 
 

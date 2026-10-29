@@ -2,22 +2,19 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
-from pydantic import TypeAdapter, ValidationError
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .db_models import (
     AnalysisRow,
-    CoachSessionRow,
     CriticalMomentRow,
     GameRow,
-    MessageRow,
     PlayerMemoryRow,
     PlayerRow,
     QuizAttemptRow,
     ReviewScheduleRow,
-    StreamEventRow,
     TrainingPlanRow,
     TrainingPositionRow,
 )
@@ -27,9 +24,6 @@ from .models import (
     CriticalMoment,
     GameMetadata,
     MoveRecord,
-    CoachMessageView,
-    CoachSessionSummaryView,
-    CoachSessionView,
     PlayerProfile,
     ProgressSummary,
     TrainingPositionView,
@@ -72,6 +66,39 @@ def player_profile(session: Session, player: PlayerRow) -> PlayerProfile:
     )
 
 
+def game_url(link: str) -> str | None:
+    """Return the link when it identifies one game (a Chess.com/Lichess game URL)."""
+    parsed = urlparse(link.strip())
+    if parsed.scheme in {"http", "https"} and parsed.path.strip("/"):
+        return link.strip()
+    return None
+
+
+def find_stored_game(
+    session: Session, player_id: str, game_id: str, link: str
+) -> GameRow | None:
+    """Find a player's stored game by id, falling back to its game URL.
+
+    Game ids hash the PGN headers, so a game whose opponent later renamed their
+    account gets a new id on the next sync; the URL still identifies it.
+    """
+    game = session.scalar(
+        select(GameRow).where(
+            GameRow.player_id == player_id,
+            GameRow.external_game_id == game_id,
+        )
+    )
+    url = game_url(link)
+    if game is None and url:
+        game = session.scalar(
+            select(GameRow)
+            .where(GameRow.player_id == player_id, GameRow.link == url)
+            .order_by(GameRow.created_at)
+            .limit(1)
+        )
+    return game
+
+
 def persist_analyses(
     session: Session,
     platform: str,
@@ -82,15 +109,11 @@ def persist_analyses(
     latest_rating = player.current_rating
     for analysis in response.analyses:
         metadata = analysis.game
-        game = session.scalar(
-            select(GameRow).where(
-                GameRow.player_id == player.id,
-                GameRow.external_game_id == metadata.game_id,
-            )
-        )
+        game = find_stored_game(session, player.id, metadata.game_id, metadata.link)
         if game is None:
             game = GameRow(player_id=player.id, external_game_id=metadata.game_id)
             session.add(game)
+        game.external_game_id = metadata.game_id
         game.white = metadata.white
         game.black = metadata.black
         game.result = metadata.result
@@ -151,7 +174,9 @@ def persist_analyses(
     return player
 
 
-def load_analyses(session: Session, platform: str, username: str) -> AnalyzeResponse:
+def load_analyses(
+    session: Session, platform: str, username: str, game_id: str | None = None
+) -> AnalyzeResponse:
     player = session.scalar(
         select(PlayerRow).where(
             PlayerRow.platform == platform,
@@ -160,10 +185,11 @@ def load_analyses(session: Session, platform: str, username: str) -> AnalyzeResp
     )
     if player is None:
         return AnalyzeResponse(analyses=[])
+    query = select(GameRow).where(GameRow.player_id == player.id)
+    if game_id is not None:
+        query = query.where(GameRow.external_game_id == game_id)
     games = session.scalars(
-        select(GameRow)
-        .where(GameRow.player_id == player.id)
-        .order_by(GameRow.played_at.desc(), GameRow.created_at.desc())
+        query.order_by(GameRow.played_at.desc(), GameRow.created_at.desc())
     ).all()
     analyses: list[CoachAnalysis] = []
     for game in games:
@@ -186,6 +212,8 @@ def load_analyses(session: Session, platform: str, username: str) -> AnalyzeResp
             player_color=game.player_color,
             player_result=game.player_result,
             player_elo=game.player_elo,
+            opponent_elo=game_payload.get("opponent_elo"),
+            termination=game_payload.get("termination", ""),
         )
         moments = session.scalars(
             select(CriticalMomentRow)
@@ -251,7 +279,8 @@ def recompute_player_memory(session: Session, player_id: str) -> PlayerMemoryRow
     by_theme: dict[str, list[bool]] = {}
     for attempt in attempts:
         position = session.get(TrainingPositionRow, attempt.position_id)
-        if position:
+        # Library puzzles train the theme but do not measure transfer from the player's games.
+        if position and position.source != "puzzle":
             by_theme.setdefault(position.theme, []).append(attempt.correct)
     memory.quiz_accuracy = {
         theme: round(sum(values) / len(values), 3) for theme, values in by_theme.items()
@@ -268,155 +297,6 @@ def recompute_player_memory(session: Session, player_id: str) -> PlayerMemoryRow
 
 def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
-
-
-def create_coach_session(
-    session: Session, platform: str, username: str, focus_theme: str | None = None
-) -> CoachSessionRow:
-    player = get_or_create_player(session, platform, username)
-    if not focus_theme:
-        memory = session.get(PlayerMemoryRow, player.id)
-        focus_theme = max(memory.recurring_themes, key=memory.recurring_themes.get) if memory and memory.recurring_themes else "candidate_move_discipline"
-    row = CoachSessionRow(player_id=player.id, focus_theme=focus_theme)
-    session.add(row)
-    session.flush()
-    return row
-
-
-def add_message(
-    session: Session,
-    session_id: str,
-    role: str,
-    content: str,
-    *,
-    history: list[dict] | None = None,
-    trace_id: str | None = None,
-) -> MessageRow:
-    next_sequence = (session.scalar(select(func.max(MessageRow.sequence)).where(MessageRow.session_id == session_id)) or 0) + 1
-    row = MessageRow(
-        session_id=session_id,
-        sequence=next_sequence,
-        role=role,
-        content=content,
-        message_history=history or [],
-        trace_id=trace_id,
-    )
-    session.add(row)
-    coach_session = session.get(CoachSessionRow, session_id)
-    if coach_session:
-        coach_session.updated_at = datetime.now(UTC)
-    session.flush()
-    return row
-
-
-def add_stream_event(
-    session: Session, message_id: str, event_type: str, payload: dict
-) -> StreamEventRow:
-    next_sequence = (session.scalar(select(func.max(StreamEventRow.sequence)).where(StreamEventRow.message_id == message_id)) or 0) + 1
-    row = StreamEventRow(
-        message_id=message_id,
-        sequence=next_sequence,
-        event_type=event_type,
-        payload=payload,
-    )
-    session.add(row)
-    session.flush()
-    return row
-
-
-def session_view(session: Session, session_id: str) -> CoachSessionView | None:
-    row = session.get(CoachSessionRow, session_id)
-    if row is None:
-        return None
-    player = session.get(PlayerRow, row.player_id)
-    if player is None:
-        return None
-    messages = session.scalars(
-        select(MessageRow).where(MessageRow.session_id == row.id).order_by(MessageRow.sequence)
-    ).all()
-    panel = None
-    for message in reversed(messages):
-        event = session.scalar(
-            select(StreamEventRow)
-            .where(
-                StreamEventRow.message_id == message.id,
-                StreamEventRow.event_type == "panel_ready",
-            )
-            .order_by(StreamEventRow.sequence.desc())
-        )
-        if event:
-            from .models import CoachPanel
-            try:
-                panel = TypeAdapter(CoachPanel).validate_python(event.payload)
-                break
-            except ValidationError:
-                continue
-    return CoachSessionView(
-        id=row.id,
-        player=player_profile(session, player),
-        status=row.status,
-        focus_theme=row.focus_theme,
-        summary=row.summary,
-        messages=[
-            CoachMessageView(
-                id=item.id,
-                sequence=item.sequence,
-                role=item.role,  # type: ignore[arg-type]
-                content=item.content,
-                trace_id=item.trace_id,
-                created_at=_aware(item.created_at),
-            )
-            for item in messages
-        ],
-        active_panel=panel,
-        created_at=_aware(row.created_at),
-    )
-
-
-def list_coach_sessions(
-    session: Session, platform: str, username: str, limit: int = 20
-) -> list[CoachSessionSummaryView]:
-    player = session.scalar(
-        select(PlayerRow).where(
-            PlayerRow.platform == platform,
-            PlayerRow.username_normalized == normalize_username(username),
-        )
-    )
-    if player is None:
-        return []
-    rows = session.scalars(
-        select(CoachSessionRow)
-        .where(CoachSessionRow.player_id == player.id)
-        .order_by(CoachSessionRow.updated_at.desc())
-        .limit(limit)
-    ).all()
-    summaries = []
-    for row in rows:
-        count = session.scalar(
-            select(func.count(MessageRow.id)).where(MessageRow.session_id == row.id)
-        ) or 0
-        if count == 0:
-            continue
-        latest = session.scalar(
-            select(MessageRow)
-            .where(
-                MessageRow.session_id == row.id,
-                MessageRow.role == "user",
-                MessageRow.content != "",
-            )
-            .order_by(MessageRow.sequence.desc())
-        )
-        summaries.append(
-            CoachSessionSummaryView(
-                id=row.id,
-                focus_theme=row.focus_theme,
-                message_count=count,
-                preview=(latest.content[:140] if latest else "Saved coaching session"),
-                created_at=_aware(row.created_at),
-                updated_at=_aware(row.updated_at),
-            )
-        )
-    return summaries
 
 
 def training_session_view(session: Session, plan_id: str) -> TrainingSessionView | None:
@@ -442,6 +322,8 @@ def training_session_view(session: Session, plan_id: str) -> TrainingSessionView
                 choices=item.choices,
                 theme=item.theme,
                 difficulty=item.difficulty,  # type: ignore[arg-type]
+                source="puzzle" if item.source == "puzzle" else "game",
+                rating=item.rating,
             )
             for item in positions
         ],

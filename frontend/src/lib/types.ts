@@ -1,3 +1,15 @@
+export type MoveClassification =
+  | 'brilliant'
+  | 'great'
+  | 'best'
+  | 'excellent'
+  | 'good'
+  | 'book'
+  | 'inaccuracy'
+  | 'mistake'
+  | 'miss'
+  | 'blunder';
+
 type MoveRecord = {
   ply: number;
   move_number: number;
@@ -7,6 +19,25 @@ type MoveRecord = {
   fen_before: string;
   fen_after: string;
   is_player_move: boolean;
+  // Engine fields (analysis v2; absent/null on games analyzed earlier). White's POV, after the move.
+  eval_cp?: number | null;
+  eval_mate?: number | null;
+  win_pct?: number | null;
+  win_pct_loss?: number | null;
+  accuracy?: number | null;
+  classification?: MoveClassification | null;
+  best_uci?: string | null;
+  best_san?: string | null;
+  clock_seconds?: number | null;
+  time_spent_seconds?: number | null;
+  time_pressure?: boolean;
+};
+
+export type EvalPoint = {
+  ply: number;
+  eval_cp: number | null;
+  eval_mate: number | null;
+  win_pct: number;
 };
 
 export type CriticalMoment = {
@@ -56,6 +87,9 @@ export type CoachAnalysis = {
   summary: string;
   training_plan: string[];
   retrieval_notes: string[];
+  accuracy?: { white: number | null; black: number | null } | null;
+  eval_series?: EvalPoint[];
+  classification_counts?: Record<string, Partial<Record<MoveClassification, number>>>;
 };
 
 export type AnalyzeResponse = {
@@ -99,6 +133,8 @@ type TrainingPosition = {
   theme: string;
   difficulty: Difficulty;
   prompt: string;
+  source?: 'game' | 'puzzle';
+  rating?: number | null;
 };
 
 export type TrainingSession = {
@@ -155,3 +191,21 @@ export type MonitoringSummary = {
   memory_retrievals: number;
   recent_events: Array<Record<string, unknown>>;
 };
+
+export interface CoachingOutput {
+  answer: string;
+  evidence: string[];
+  recommended_move: string | null;
+  principle: string;
+  drill: string;
+  confidence: number;
+}
+
+export interface CoachAskResponse {
+  answer: string;
+  coaching: CoachingOutput;
+  used_llm: boolean;
+  tools_used: string[];
+  retrieved_notes: string[];
+  message_history: unknown[];
+}

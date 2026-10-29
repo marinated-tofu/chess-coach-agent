@@ -10,6 +10,7 @@ import {
   YAxis
 } from 'recharts';
 import { getProgress } from '../lib/api';
+import { OpeningsPanel } from '../components/OpeningsPanel';
 import { useWorkspace } from '../workspace/WorkspaceContext';
 
 export function ProgressPage() {
@@ -54,6 +55,7 @@ export function ProgressPage() {
           )) : <p className="monitoring-empty">No themes measured yet.</p>}
         </div>
       </section>
+      <OpeningsPanel username={workspace.player} platform={workspace.platform} />
     </main>
   );
 }

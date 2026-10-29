@@ -1,0 +1,188 @@
+.cb-board {
+  position: relative;
+  width: min(100%, 560px);
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #cfb18d;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.practice-board {
+  align-content: center;
+}
+
+.practice-board .cb-board {
+  width: min(100%, 620px);
+}
+
+.cb-square {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.cb-board[data-interactive] {
+  touch-action: none;
+}
+
+.cb-board[data-interactive] .cb-square {
+  cursor: pointer;
+}
+
+.cb-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cb-last {
+  background-color: rgba(214, 178, 52, 0.48);
+}
+
+.cb-selected {
+  background-color: rgba(25, 135, 84, 0.45);
+}
+
+.cb-check {
+  box-shadow: inset 0 0 0 4px rgba(200, 30, 36, 0.85);
+  background-color: rgba(200, 30, 36, 0.32);
+}
+
+.cb-target {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.cb-dot {
+  inset: 36%;
+  border-radius: 50%;
+  background-color: rgba(20, 60, 40, 0.32);
+}
+
+.cb-capture {
+  inset: 4%;
+  border-radius: 50%;
+  border: 5px solid rgba(20, 60, 40, 0.32);
+}
+
+.cb-promotion-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(24, 30, 36, 0.45);
+}
+
+.cb-promotion {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(20, 28, 36, 0.25);
+  transition: transform 160ms ease-out, opacity 160ms ease-out;
+}
+
+@starting-style {
+  .cb-promotion {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.cb-promotion-title {
+  color: #27313a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cb-promotion-options {
+  display: flex;
+  gap: 8px;
+}
+
+.cb-promotion-options button {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  padding: 4px;
+  border: 1px solid #dce4df;
+  border-radius: 6px;
+  background: #f7f9f7;
+  cursor: pointer;
+  transition: transform 140ms ease-out;
+}
+
+.cb-promotion-options button svg {
+  width: 100%;
+  height: 100%;
+}
+
+.cb-promotion-options button:focus-visible,
+.cb-promotion-cancel:focus-visible {
+  outline: 2px solid #198754;
+  outline-offset: 2px;
+}
+
+.cb-promotion-options button:active,
+.cb-promotion-cancel:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cb-promotion-options button:hover {
+    border-color: #198754;
+    background: #eef6f1;
+  }
+}
+
+.cb-promotion-cancel {
+  border: 0;
+  background: none;
+  color: #4b5866;
+  font-size: 13px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: transform 140ms ease-out;
+}
+
+@media (max-width: 480px) {
+  .cb-promotion-options button {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-promotion,
+  .cb-promotion-options button,
+  .cb-promotion-cancel {
+    transition: none;
+  }
+}
+
+/* Practice page: move entry around the interactive board */
+.practice-controls .practice-instructions {
+  margin: 0;
+  font-size: 14px;
+  text-wrap: pretty;
+}
+
+.practice-grading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #52625a;
+  font-size: 14px;
+}
+
+.practice-best {
+  font-variant-numeric: tabular-nums;
+}

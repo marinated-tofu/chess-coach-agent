@@ -1,0 +1,55 @@
+/* Set up position: board editor on the left, image reader and next steps on the right. */
+
+.setup-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "editor image"
+    "editor go";
+  gap: 16px 20px;
+  align-items: start;
+}
+
+.setup-editor { grid-area: editor; }
+.setup-image { grid-area: image; }
+.setup-go { grid-area: go; }
+
+.setup-card {
+  min-width: 0;
+  padding: 20px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 45px rgba(52, 70, 88, 0.11);
+}
+
+.setup-go {
+  display: grid;
+  gap: 10px;
+}
+
+.setup-go .primary {
+  justify-content: center;
+}
+
+.setup-blocked {
+  margin: 0;
+  color: #b4262e;
+  font-size: 14px;
+  text-wrap: pretty;
+}
+
+@media (max-width: 1100px) {
+  /* Narrow screens: the picture comes first, since reading one is the quickest start. */
+  .setup-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas: "image" "editor" "go";
+  }
+}
+
+@media (max-width: 720px) {
+  .setup-card {
+    padding: 14px;
+  }
+}

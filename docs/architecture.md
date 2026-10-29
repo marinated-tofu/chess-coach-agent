@@ -19,19 +19,22 @@ Direct practice selection from stored mistakes
 Stockfish move grading --> quiz attempt --> review schedule --> player memory
         ^                                                       |
         +---------------- adaptive difficulty ------------------+
+
+Game review or practice board --> Coach panel --> POST /api/coach/ask --> PydanticAI agent + 9 tools
 ```
 
-Stockfish and deterministic legality checks are authoritative for chess claims. The user-facing
-workflow does not wait for an LLM: it selects stored mistakes, grades moves, and schedules review
-deterministically. PydanticAI and MiniMax remain isolated to agent and judge evaluation workflows.
+Stockfish and deterministic legality checks are authoritative for chess claims. Importing,
+practice selection, move grading, and review scheduling never wait for an LLM. The LLM is used in
+two places: the coach, which answers the player's questions on the game review and practice pages,
+and the offline LLM judge.
 
 ## Storage
 
 Postgres is the production system of record; SQLite is the credential-free local fallback.
 SQLAlchemy repositories isolate persistence from FastAPI routes, and Alembic owns schema changes.
 The active product schema stores players, games, analyses, moments, sync jobs, player memory, plans,
-positions, attempts, schedules, and lesson chunks. Retired chat tables remain in the historical
-Alembic migration and can be removed in a later schema migration.
+positions, attempts, schedules, and lesson chunks. Coach conversations are not stored on the
+server; the browser keeps the message history.
 
 Player identity is normalized `(platform, username)`. Chess.com and Lichess handles are separate
 profiles. Browser session storage is only an offline cache for the most recently viewed analyses.
@@ -39,14 +42,14 @@ profiles. Browser session storage is only an offline cache for the most recently
 ## Player Memory
 
 Rating, recurring themes, quiz accuracy, mastery, and due counts are deterministically recomputed.
-Only imports, Stockfish results, attempts, hint use, and explicit feedback update player state. The
-former conversation-memory prototype remains covered by isolated tests but is not on a production
-HTTP path after the chat experience was retired.
+Only imports, Stockfish results, attempts, hint use, and explicit feedback update player state.
+Coach questions read this memory (top recurring themes, quiz accuracy by theme, due and mastered
+counts) and add it to the prompt; they never write to it.
 
 ## Retrieval
 
 Raw PGNs, FENs, evaluations, and attempts are relational and are never embedded. pgvector stores
-384-dimensional FastEmbed vectors for curated lesson chunks and compact session summaries. Lesson
+384-dimensional vectors for the curated lesson chunks. Lesson
 retrieval compares title search, BM25, vector cosine search, and hybrid reciprocal-rank fusion. The
 20-query benchmark controls the production strategy through explicit quality and latency gates.
 
@@ -56,8 +59,14 @@ facts are queried relationally rather than embedded as prose.
 ## HTTP Flow
 
 Training endpoints create plans from real mistakes and grade legal SAN or UCI moves with Stockfish
-before updating spaced repetition. The React app exposes this directly at `/practice`; legacy coach
-URLs redirect there and no chat UI is shipped.
+before updating spaced repetition. The React app exposes this at `/practice`.
+
+`POST /api/coach/ask` takes the question, the player, an optional selected game ID, the FEN on the
+player's board, and the PydanticAI message history from earlier turns. The server loads the
+selected game's critical moments and the player's weakness memory, runs the agent, and returns a
+validated `CoachingOutput`, the tools that were called, and the updated message history. Without an
+API key, or on error or timeout, it returns a deterministic engine-based answer instead. See
+[`pydantic_ai_map.md`](pydantic_ai_map.md).
 
 `POST /api/games/sync` creates or resumes one active sync job per player. The server fetches up to
 5,000 games, skips external game IDs with existing analyses, and persists progress for polling via
@@ -84,6 +93,4 @@ state plus the offline analysis cache.
 | `GET` | `/api/training/sessions/{id}` | Fetch session positions |
 | `POST` | `/api/training/sessions/{id}/attempts` | Grade a move and update review schedule |
 | `GET` | `/api/progress/{platform}/{username}` | Rating, theme accuracy, mastery, transfer trends |
-
-There is no public `/api/chat` or coach-session route in the shipped product. PydanticAI and the
-LLM judge run only through offline evaluation commands documented in the README.
+| `POST` | `/api/coach/ask` | Ask the PydanticAI coach about a game or position |

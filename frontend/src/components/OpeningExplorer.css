@@ -1,0 +1,421 @@
+.explorer {
+  --explorer-ink: #17201b;
+  --explorer-muted: #66736b;
+  --explorer-line: #e6ece8;
+  --explorer-hover: #f3f7f5;
+  --explorer-win: #397c57;
+  --explorer-draw: #b3bcb7;
+  --explorer-loss: #c4574f;
+  --explorer-white: #f6f5f0;
+  --explorer-black: #2f3531;
+  --explorer-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  min-width: 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 45px rgba(52, 70, 88, 0.11);
+  color: var(--explorer-ink);
+}
+
+.explorer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  margin-bottom: 10px;
+}
+
+.explorer-head h2 {
+  margin: 0;
+  font-size: 15px;
+  text-wrap: balance;
+}
+
+.explorer-opening {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: #33413a;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.explorer-eco {
+  color: var(--explorer-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.explorer-muted {
+  color: var(--explorer-muted);
+  font-weight: 400;
+}
+
+/* Tabs */
+.explorer-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding: 3px;
+  border-radius: 7px;
+  background: #eef3f0;
+}
+
+.explorer-tabs button {
+  flex: 1 1 0;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #3d4a42;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 160ms var(--explorer-ease);
+}
+
+.explorer-tabs button[aria-selected="true"] {
+  background: #ffffff;
+  color: var(--explorer-ink);
+  box-shadow: 0 1px 3px rgba(23, 32, 27, 0.14);
+}
+
+.explorer-tabs button:active,
+.explorer-colors button:active {
+  transform: scale(0.97);
+}
+
+.explorer-tabs button:focus-visible,
+.explorer-colors button:focus-visible,
+.explorer-move:focus-visible,
+.explorer-link:focus-visible,
+.explorer-games a:focus-visible {
+  outline: 2px solid #2062c4;
+  outline-offset: 1px;
+}
+
+.explorer-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  color: var(--explorer-muted);
+  font-size: 12px;
+}
+
+.explorer-colors > span {
+  margin-right: 4px;
+}
+
+.explorer-colors button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--explorer-line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #3d4a42;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 160ms var(--explorer-ease);
+}
+
+.explorer-colors button[aria-checked="true"] {
+  border-color: #17201b;
+  background: #17201b;
+  color: #ffffff;
+}
+
+/* Table */
+.explorer-body {
+  transition: opacity 150ms ease;
+}
+
+.explorer-body[data-stale] {
+  opacity: 0.55;
+}
+
+.explorer-table {
+  display: grid;
+  max-height: 372px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.explorer-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #ffffff;
+}
+
+.explorer-row {
+  display: grid;
+  grid-template-columns: minmax(52px, 0.7fr) minmax(66px, 0.9fr) minmax(0, 2.4fr) 44px;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 8px;
+}
+
+.explorer-header {
+  min-height: 26px;
+  border-bottom: 1px solid var(--explorer-line);
+  color: var(--explorer-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.explorer-header > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.explorer-header > span:last-child,
+.explorer-row > .explorer-num:last-child {
+  text-align: right;
+}
+
+.explorer-move {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--explorer-line);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.explorer-move:last-child {
+  border-bottom: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .explorer-move:hover {
+    background: var(--explorer-hover);
+  }
+
+  .explorer-link:hover {
+    text-decoration: underline;
+  }
+
+  .explorer-games a:hover {
+    background: var(--explorer-hover);
+  }
+}
+
+.explorer-move:active {
+  background: #e9f0ec;
+}
+
+.explorer-move[data-wrong] {
+  box-shadow: inset 3px 0 0 var(--explorer-loss);
+}
+
+.explorer-san {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.explorer-num {
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.explorer-num .explorer-muted {
+  font-size: 11px;
+}
+
+.explorer-wrong-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--explorer-loss);
+}
+
+.explorer-wrong-dot.inline {
+  margin-right: 2px;
+  vertical-align: 1px;
+}
+
+.explorer-bar {
+  display: flex;
+  height: 16px;
+  overflow: hidden;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(23, 32, 27, 0.08);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+.explorer-bar-seg {
+  flex-basis: 0;
+  min-width: 2px;
+  overflow: hidden;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.explorer-bar-seg.win { background: var(--explorer-win); color: #ffffff; }
+.explorer-bar-seg.draw { background: var(--explorer-draw); color: #26302a; }
+.explorer-bar-seg.loss { background: var(--explorer-loss); color: #ffffff; }
+.explorer-bar-seg.white { background: var(--explorer-white); color: #26302a; }
+.explorer-bar-seg.black { background: var(--explorer-black); color: #ffffff; }
+
+.explorer-warning {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--explorer-loss);
+  border-radius: 0 6px 6px 0;
+  background: #fbefee;
+  color: #5b2622;
+  font-size: 13px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.explorer-foot {
+  margin: 8px 0 0;
+  color: var(--explorer-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-wrap: pretty;
+}
+
+/* Empty, error */
+.explorer-empty {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  padding: 14px 4px;
+}
+
+.explorer-empty p {
+  margin: 0;
+  color: #3d4a42;
+  font-size: 13px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.explorer-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1d5fb8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Skeleton */
+.explorer-skeleton-row {
+  border-bottom: 1px solid var(--explorer-line);
+}
+
+.explorer-skeleton {
+  display: block;
+  height: 10px;
+  border-radius: 4px;
+  background: #edf1ef;
+  animation: explorer-pulse 1.2s ease-in-out infinite;
+}
+
+.explorer-skeleton-bar {
+  height: 16px;
+}
+
+@keyframes explorer-pulse {
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explorer-skeleton { animation: none; }
+  .explorer-tabs button,
+  .explorer-colors button { transition: none; }
+}
+
+/* Top games */
+.explorer-games {
+  margin-top: 14px;
+}
+
+.explorer-games h3 {
+  margin: 0 0 4px;
+  color: var(--explorer-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.explorer-games ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.explorer-games a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--explorer-line);
+  font-size: 12px;
+}
+
+.explorer-games li:last-child a {
+  border-bottom: 0;
+}
+
+.explorer-players {
+  display: grid;
+  min-width: 0;
+}
+
+.explorer-players > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.explorer-result {
+  min-width: 34px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #eef3f0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: center;
+}
+
+.explorer-result.white { background: var(--explorer-white); box-shadow: inset 0 0 0 1px #d9ddd8; }
+.explorer-result.black { background: var(--explorer-black); color: #ffffff; }
+
+.explorer-games .explorer-num {
+  text-align: right;
+}
+
+@media (max-width: 420px) {
+  .explorer-row {
+    grid-template-columns: 48px 62px minmax(0, 1fr) 38px;
+    gap: 8px;
+    padding: 0 4px;
+  }
+}

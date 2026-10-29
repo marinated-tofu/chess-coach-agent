@@ -27,7 +27,13 @@ class Base(DeclarativeBase):
 
 
 DATABASE_URL = database_url()
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# SQLite's default 5 s lock wait is shorter than loading a large game library, so a sync
+# job's writes failed with "database is locked" while the games page was reading.
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={"timeout": 30} if DATABASE_URL.startswith("sqlite") else {},
+)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 if DATABASE_URL.startswith("sqlite"):

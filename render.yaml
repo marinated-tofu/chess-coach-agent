@@ -14,13 +14,19 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: OPENROUTER_MODEL
-        value: minimax/minimax-m3
+        value: anthropic/claude-haiku-5.5
       - key: STOCKFISH_DEPTH
         value: "7"
       - key: MONITORING_LOG_PATH
         value: /tmp/chess-coach-events.jsonl
       - key: ENABLE_LOCAL_EMBEDDINGS
         value: "true"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: LICHESS_CLIENT_ID
+        value: chess-coach-agent
+      - key: PUBLIC_BASE_URL
+        sync: false
 
 databases:
   - name: chess-coach-db

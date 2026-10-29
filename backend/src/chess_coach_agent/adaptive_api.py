@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import time
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlalchemy import select
@@ -10,12 +12,17 @@ from .agent import ChessCoachAgent
 from .analysis import ANALYSIS_VERSION
 from .db_models import (
     AnalysisRow,
-    GameRow,
+    PlayerMemoryRow,
     SyncJobRow,
 )
-from .importers import fetch_platform_pgn, preview_pgn_games
+from .llm import ask_coach, estimate_cost
+from .importers import ImportSourceError, fetch_platform_pgn, preview_pgn_games
 from .models import (
     AnalyzeResponse,
+    CoachAnalysis,
+    CoachAskRequest,
+    CoachAskResponse,
+    CoachFeedbackRequest,
     EvaluationPanel,
     PlayerProfile,
     ProgressSummary,
@@ -27,6 +34,7 @@ from .models import (
 )
 from .monitoring import log_event
 from .repositories import (
+    find_stored_game,
     get_or_create_player,
     load_analyses,
     player_profile,
@@ -39,6 +47,9 @@ from .training import build_training_session, evaluate_attempt
 
 router = APIRouter(prefix="/api")
 coach_agent = ChessCoachAgent()
+ACTIVE_SYNC_STATUSES = ("queued", "fetching", "analyzing")
+# A job whose row has not moved in this long lost its worker (e.g. the server restarted).
+STALE_SYNC_AFTER = timedelta(minutes=10)
 
 
 def _sync_job_view(row: SyncJobRow) -> SyncJobView:
@@ -54,6 +65,12 @@ def _sync_job_view(row: SyncJobRow) -> SyncJobView:
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
+
+
+def _sync_error_message(exc: Exception) -> str:
+    if isinstance(exc, ImportSourceError):
+        return str(exc)
+    return str(exc) or exc.__class__.__name__
 
 
 async def _process_sync_job(job_id: str, request: SyncGamesRequest) -> None:
@@ -77,19 +94,21 @@ async def _process_sync_job(job_id: str, request: SyncGamesRequest) -> None:
             job.status = "analyzing"
             job.total_games = len(previews)
 
+        failed_games = 0
         for preview in previews:
             with session_scope() as session:
                 job = session.get(SyncJobRow, job_id)
                 if job is None:
                     return
-                existing = session.scalar(
-                    select(GameRow)
-                    .where(
-                        GameRow.player_id == job.player_id,
-                        GameRow.external_game_id == preview.game_id,
-                    )
+                existing = find_stored_game(
+                    session, job.player_id, preview.game_id, preview.link
                 )
-                if existing and ANALYSIS_VERSION in (
+                # Games re-analyzed offline lack the PGN-only fields (clocks, opponent rating,
+                # termination), so a sync analyzes them once more from the fetched PGN.
+                has_pgn_fields = existing is not None and "opponent_elo" in (
+                    (existing.metadata_json or {}).get("game", {})
+                )
+                if existing and has_pgn_fields and ANALYSIS_VERSION in (
                     session.scalar(
                         select(AnalysisRow.retrieval_notes).where(
                             AnalysisRow.game_id == existing.id
@@ -100,35 +119,57 @@ async def _process_sync_job(job_id: str, request: SyncGamesRequest) -> None:
                     job.skipped_games += 1
                     continue
 
-            response = await asyncio.to_thread(
-                coach_agent.import_pgn_text,
-                preview.pgn,
-                request.username,
-                1,
-            )
-            with session_scope() as session:
-                persist_analyses(
-                    session, request.platform, request.username, response
+            try:
+                response = await asyncio.to_thread(
+                    coach_agent.import_pgn_text,
+                    preview.pgn,
+                    request.username,
+                    1,
                 )
+                with session_scope() as session:
+                    persist_analyses(
+                        session, request.platform, request.username, response
+                    )
+            except Exception as exc:
+                # One unreadable game must not block every later game (and every later sync).
+                failed_games += 1
+                log_event(
+                    "games_sync_game_failed",
+                    {"job_id": job_id, "game_id": preview.game_id, "error": _sync_error_message(exc)},
+                )
+                response = None
+            with session_scope() as session:
                 job = session.get(SyncJobRow, job_id)
                 if job:
-                    job.analyzed_games += len(response.analyses)
+                    if response is None:
+                        job.skipped_games += 1
+                    else:
+                        job.analyzed_games += len(response.analyses)
+                        job.skipped_games += 1 - len(response.analyses)
 
         with session_scope() as session:
             job = session.get(SyncJobRow, job_id)
             if job:
                 job.status = "complete"
+                if failed_games:
+                    job.error = f"{failed_games} game(s) could not be analyzed and were skipped."
         log_event(
             "games_sync_completed",
             {"job_id": job_id, "platform": request.platform, "username": request.username},
         )
     except Exception as exc:
+        message = _sync_error_message(exc)
         with session_scope() as session:
             job = session.get(SyncJobRow, job_id)
             if job:
                 job.status = "failed"
-                job.error = str(exc)
-        log_event("games_sync_failed", {"job_id": job_id, "error": str(exc)})
+                job.error = message
+        log_event("games_sync_failed", {"job_id": job_id, "error": message})
+
+
+def _is_stale(job: SyncJobRow) -> bool:
+    updated = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=UTC)
+    return datetime.now(UTC) - updated > STALE_SYNC_AFTER
 
 
 @router.post("/games/sync", response_model=SyncJobView)
@@ -137,16 +178,19 @@ async def sync_games(
 ) -> SyncJobView:
     with session_scope() as session:
         player = get_or_create_player(session, request.platform, request.username)
-        active = session.scalar(
+        active_jobs = session.scalars(
             select(SyncJobRow)
             .where(
                 SyncJobRow.player_id == player.id,
-                SyncJobRow.status.in_(["queued", "fetching", "analyzing"]),
+                SyncJobRow.status.in_(ACTIVE_SYNC_STATUSES),
             )
             .order_by(SyncJobRow.created_at.desc())
-        )
-        if active:
-            return _sync_job_view(active)
+        ).all()
+        for active in active_jobs:
+            if not _is_stale(active):
+                return _sync_job_view(active)
+            active.status = "failed"
+            active.error = "Sync was interrupted before it finished. Start it again to resume."
         job = SyncJobRow(
             player_id=player.id,
             platform=request.platform,
@@ -169,9 +213,11 @@ def get_sync_job(job_id: str) -> SyncJobView:
 
 
 @router.get("/games/{platform}/{username}", response_model=AnalyzeResponse)
-def get_analyzed_games(platform: str, username: str) -> AnalyzeResponse:
+def get_analyzed_games(
+    platform: str, username: str, game_id: str | None = None
+) -> AnalyzeResponse:
     with session_scope() as session:
-        return load_analyses(session, platform, username)
+        return load_analyses(session, platform, username, game_id)
 
 
 @router.get("/players/{platform}/{username}", response_model=PlayerProfile)
@@ -191,13 +237,20 @@ def create_training_session(request: TrainingSessionCreate) -> TrainingSessionVi
             request.theme,
             request.position_count,
             request.moment_id,
+            request.mode,
         )
         view = training_session_view(session, plan.id)
         if view is None:
             raise HTTPException(500, "Training session could not be created")
         log_event(
             "training_session_created",
-            {"training_session_id": plan.id, "positions": len(view.positions), "difficulty": plan.difficulty},
+            {
+                "training_session_id": plan.id,
+                "positions": len(view.positions),
+                "puzzles": sum(item.source == "puzzle" for item in view.positions),
+                "mode": request.mode,
+                "difficulty": plan.difficulty,
+            },
         )
         return view
 
@@ -249,3 +302,69 @@ def submit_training_attempt(
 def get_progress(platform: str, username: str) -> ProgressSummary:
     with session_scope() as session:
         return progress_summary(session, platform, username)
+
+
+def _player_memory_context(session, player_id: str) -> str:
+    memory = session.get(PlayerMemoryRow, player_id)
+    if memory is None:
+        return ""
+    themes = ", ".join(
+        f"{theme.replace('_', ' ')} {weight:.2f}"
+        for theme, weight in sorted(memory.recurring_themes.items(), key=lambda item: -item[1])[:5]
+    )
+    accuracy = ", ".join(f"{theme.replace('_', ' ')} {value:.0%}" for theme, value in memory.quiz_accuracy.items())
+    return (
+        f"Recurring weakness themes: {themes or 'not enough data'}\n"
+        f"Quiz accuracy by theme: {accuracy or 'no attempts yet'}\n"
+        f"Due positions: {memory.due_positions}; mastered positions: {memory.mastered_positions}"
+    )
+
+
+@router.post("/coach/ask", response_model=CoachAskResponse)
+async def ask_coach_route(request: CoachAskRequest) -> CoachAskResponse:
+    def load_context() -> tuple[str, CoachAnalysis | None]:
+        with session_scope() as session:
+            player = get_or_create_player(session, request.platform, request.username)
+            memory = _player_memory_context(session, player.id)
+            if request.game_id is None:
+                return memory, None
+            analyses = load_analyses(session, request.platform, request.username, request.game_id).analyses
+            return memory, analyses[0] if analyses else None
+
+    memory, analysis = await asyncio.to_thread(load_context)
+    started = time.perf_counter()
+    response = await ask_coach(
+        request.question,
+        analysis,
+        fen=request.fen,
+        platform=request.platform,
+        username=request.username,
+        memory_context=memory,
+        message_history=request.message_history,
+    )
+    log_event(
+        "coach_answered",
+        {
+            "player": request.username,
+            "game_id": request.game_id,
+            "used_llm": response.used_llm,
+            "fallback_reason": response.fallback_reason,
+            "tools_used": response.tools_used,
+            "arrows": len(response.arrows),
+            "highlights": len(response.highlights),
+            "annotations_dropped": response.annotations_dropped,
+            "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            "usage": {
+                "input_tokens": response.input_tokens,
+                "output_tokens": response.output_tokens,
+                "estimated_cost_usd": estimate_cost(response.input_tokens, response.output_tokens),
+            },
+        },
+    )
+    return response
+
+
+@router.post("/coach/feedback")
+def coach_feedback(request: CoachFeedbackRequest) -> dict[str, str]:
+    log_event("coach_feedback", request.model_dump())
+    return {"status": "recorded"}

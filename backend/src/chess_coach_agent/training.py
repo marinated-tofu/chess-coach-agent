@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 import chess
@@ -17,6 +19,7 @@ from .db_models import (
 )
 from .engine import EngineAnalyzer
 from .models import EvaluationPanel, QuizPanel
+from .puzzles import Puzzle, normalize_theme, select_puzzles
 from .repositories import get_or_create_player, recompute_player_memory, training_session_view
 
 
@@ -41,14 +44,58 @@ def _move_choices(fen: str, correct_move: str, difficulty: str) -> list[str]:
     if difficulty == "advanced":
         return []
     board = chess.Board(fen)
-    choices = [correct_move]
-    for move in board.legal_moves:
-        san = board.san(move)
-        if san != correct_move:
-            choices.append(san)
-        if len(choices) >= (3 if difficulty == "beginner" else 4):
-            break
+    # Forcing moves make believable distractors; the order is shuffled per position so the
+    # answer is never in a fixed slot but stays stable across reloads.
+    candidates = sorted(
+        (move for move in board.legal_moves if board.san(move) != correct_move),
+        key=lambda move: (not board.gives_check(move), not board.is_capture(move)),
+    )
+    count = 3 if difficulty == "beginner" else 4
+    choices = [correct_move, *(board.san(move) for move in candidates[: count - 1])]
+    random.Random(fen).shuffle(choices)
     return choices
+
+
+PUZZLE_RATING_OFFSET = {"beginner": -150, "intermediate": 0, "advanced": 150}
+
+
+def top_weakness(session: Session, player: PlayerRow) -> str | None:
+    """The player's most frequent critical-moment theme, if any."""
+    themes = Counter(
+        session.scalars(
+            select(CriticalMomentRow.theme)
+            .join(GameRow, CriticalMomentRow.game_id == GameRow.id)
+            .where(GameRow.player_id == player.id)
+        ).all()
+    )
+    return themes.most_common(1)[0][0] if themes else None
+
+
+def _seen_puzzle_ids(session: Session, player: PlayerRow) -> set[str]:
+    return set(
+        session.scalars(
+            select(TrainingPositionRow.puzzle_id)
+            .join(TrainingPlanRow, TrainingPositionRow.plan_id == TrainingPlanRow.id)
+            .where(
+                TrainingPlanRow.player_id == player.id,
+                TrainingPositionRow.puzzle_id.is_not(None),
+            )
+        ).all()
+    )
+
+
+def _pick_puzzles(
+    session: Session, player: PlayerRow, theme: str | None, difficulty: str, count: int
+) -> list[Puzzle]:
+    rating = (player.current_rating or 1400) + PUZZLE_RATING_OFFSET.get(difficulty, 0)
+    return select_puzzles(theme, rating, count, exclude_ids=_seen_puzzle_ids(session, player))
+
+
+def _puzzle_explanation(puzzle: Puzzle) -> str:
+    return (
+        f"Lichess puzzle {puzzle.id} (rated {puzzle.rating}) for "
+        f"{puzzle.theme.replace('_', ' ')}. The solution starts with {puzzle.solution_san}."
+    )
 
 
 def build_training_session(
@@ -58,8 +105,18 @@ def build_training_session(
     theme: str | None = None,
     position_count: int = 5,
     moment_id: str | None = None,
+    mode: str = "mixed",
 ) -> TrainingPlanRow:
+    """Build a practice session.
+
+    Positions from the player's own games always come first. In "mixed" mode, if there are
+    fewer than ``position_count`` of them, the session is topped up with library puzzles for
+    the requested theme or the player's top weakness. In "puzzles" mode the session holds
+    only puzzles. A session for one specific ``moment_id`` is never topped up.
+    """
     player = get_or_create_player(session, platform, username)
+    if mode == "puzzles":
+        return _build_puzzle_session(session, player, theme, position_count)
     moment_query = (
         select(CriticalMomentRow)
         .join(GameRow, CriticalMomentRow.game_id == GameRow.id)
@@ -88,11 +145,19 @@ def build_training_session(
             item for item in candidates if (item.explanation or {}).get("trainable", False)
         ]
         moments = (trainable or candidates)[:position_count]
-    selected_theme = theme or (moments[0].theme if moments else "candidate_move_discipline")
+    selected_theme = (
+        theme
+        or (moments[0].theme if moments else None)
+        or top_weakness(session, player)
+        or "candidate_move_discipline"
+    )
     difficulty = difficulty_for(session, player, selected_theme)
+    shortfall = 0 if moment_id else position_count - len(moments)
+    puzzles = _pick_puzzles(session, player, selected_theme, difficulty, shortfall)
+    focus = list(dict.fromkeys([item.theme for item in moments] + [item.theme for item in puzzles]))
     plan = TrainingPlanRow(
         player_id=player.id,
-        focus_themes=list(dict.fromkeys(item.theme for item in moments)) or [selected_theme],
+        focus_themes=focus or [selected_theme],
         difficulty=difficulty,
     )
     session.add(plan)
@@ -110,10 +175,54 @@ def build_training_session(
                 theme=moment.theme,
                 difficulty=difficulty,
                 explanation=(moment.explanation or {}).get("what_happened", ""),
+                source="game",
             )
         )
+    _add_puzzle_positions(session, plan, puzzles, difficulty, start=len(moments) + 1)
     session.flush()
     return plan
+
+
+def _build_puzzle_session(
+    session: Session, player: PlayerRow, theme: str | None, position_count: int
+) -> TrainingPlanRow:
+    selected_theme = normalize_theme(theme) or normalize_theme(top_weakness(session, player))
+    difficulty = difficulty_for(session, player, selected_theme or "missed_tactic")
+    puzzles = _pick_puzzles(session, player, selected_theme, difficulty, position_count)
+    plan = TrainingPlanRow(
+        player_id=player.id,
+        focus_themes=list(dict.fromkeys(item.theme for item in puzzles))
+        or [selected_theme or "missed_tactic"],
+        difficulty=difficulty,
+    )
+    session.add(plan)
+    session.flush()
+    _add_puzzle_positions(session, plan, puzzles, difficulty, start=1)
+    session.flush()
+    return plan
+
+
+def _add_puzzle_positions(
+    session: Session, plan: TrainingPlanRow, puzzles: list[Puzzle], difficulty: str, start: int
+) -> None:
+    for index, puzzle in enumerate(puzzles, start=start):
+        session.add(
+            TrainingPositionRow(
+                plan_id=plan.id,
+                moment_id=None,
+                position_order=index,
+                fen=puzzle.fen,
+                correct_move=puzzle.solution_san,
+                choices=_move_choices(puzzle.fen, puzzle.solution_san, difficulty),
+                theme=puzzle.theme,
+                difficulty=difficulty,
+                explanation=_puzzle_explanation(puzzle),
+                source="puzzle",
+                puzzle_id=puzzle.id,
+                rating=puzzle.rating,
+                solution=list(puzzle.solution),
+            )
+        )
 
 
 def quiz_panel(session: Session, plan_id: str, position_id: str | None = None) -> QuizPanel | None:

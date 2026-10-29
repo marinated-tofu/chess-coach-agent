@@ -43,8 +43,12 @@ def read_events() -> list[dict[str, Any]]:
 def monitoring_summary() -> dict[str, Any]:
     events = read_events()
     event_counts = Counter(event.get("event_type", "unknown") for event in events)
-    feedback = [event for event in events if event.get("event_type") == "moment_feedback"]
-    chats = [event for event in events if event.get("event_type") == "chat_completed"]
+    feedback = [
+        event for event in events if event.get("event_type") in {"moment_feedback", "coach_feedback"}
+    ]
+    chats = [
+        event for event in events if event.get("event_type") in {"chat_completed", "coach_answered"}
+    ]
     llm_chats = [event for event in chats if event.get("used_llm")]
     helpful = sum(event.get("rating") == "helpful" for event in feedback)
     themes = Counter(event.get("theme") for event in feedback if event.get("theme"))
@@ -94,6 +98,19 @@ def monitoring_summary() -> dict[str, Any]:
 def export_feedback_candidates(output: Path) -> int:
     candidates = []
     for event in read_events():
+        if event.get("event_type") == "coach_feedback" and event.get("rating") == "not_helpful":
+            candidates.append(
+                {
+                    "id": f"coach-feedback-{event.get('timestamp', 'unknown')}",
+                    "question": event.get("question", ""),
+                    "fen": event.get("fen"),
+                    "game_id": event.get("game_id"),
+                    "rejected_answer": event.get("answer", ""),
+                    "source": "coach_feedback",
+                    "review_status": "candidate",
+                }
+            )
+            continue
         if event.get("event_type") != "moment_feedback" or not event.get("fen"):
             continue
         candidates.append(

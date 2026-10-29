@@ -37,10 +37,20 @@ Themes do not independently create critical moments:
 - `opening_drift`: an engine-significant repeated early queen move.
 - `king_safety`: king-zone danger increases while the king remains uncastled.
 - `endgame_conversion`: an engine-significant error in a simplified position.
+- `time_pressure`: a mistake or blunder played with under 10% of the base clock left (from PGN
+  `%clk` comments). Checked first, because the clock is the likelier cause.
 - `missed_tactic`: the default when the loss is significant but the narrower detectors do not fit.
 
 Training sessions prefer mistakes and blunders. Inaccuracies are retained for complete game review
 and are used only when no stronger training position is available.
+
+## Full-game labels and accuracy
+
+Since analysis version `lichess-win-chance-v2`, every ply of both sides is evaluated (Stockfish
+MultiPV 2) and gets a label: Brilliant, Great, Best, Excellent, Good, Book, Inaccuracy, Mistake,
+Miss or Blunder, plus Lichess game accuracy per side. The error labels use the same thresholds as
+the table above. The rules for the other labels and the accuracy formula are documented in
+`backend/src/chess_coach_agent/classification.py`.
 
 ## References
 

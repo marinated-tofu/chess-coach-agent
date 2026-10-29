@@ -1,5 +1,11 @@
 import { BookOpen, Brain, CircleDot, Target, ThumbsDown, ThumbsUp } from 'lucide-react';
 import type { CoachAnalysis, CriticalMoment } from '../lib/types';
+import { MoveBadge } from './moveLabels';
+
+/** Ply 1 is White's first move; even plies are Black's ("12..."). */
+function movePrefix(moment: CriticalMoment): string {
+  return moment.ply % 2 === 1 ? `${moment.move_number}.` : `${moment.move_number}...`;
+}
 
 export function AnalysisPanel({
   analysis,
@@ -40,7 +46,9 @@ export function AnalysisPanel({
             className={selectedMoment?.id === moment.id ? 'active' : ''}
             key={moment.id}
             onClick={() => onSelectMoment(moment)}
+            aria-label={`Moment ${index + 1}: ${movePrefix(moment)} ${moment.played_san}, ${moment.judgment}`}
           >
+            <MoveBadge label={moment.judgment} />
             Moment {index + 1}
           </button>
         ))}
@@ -58,12 +66,12 @@ export function AnalysisPanel({
             <div className="move-comparison">
               <div className="move-box bad">
                 <span>Move Actually Played</span>
-                <strong>{selectedMoment.move_number}... {selectedMoment.played_san}</strong>
+                <strong>{movePrefix(selectedMoment)} {selectedMoment.played_san}</strong>
                 <small>What happened in the game</small>
               </div>
               <div className="move-box good">
                 <span>Recommended Best Move</span>
-                <strong>{selectedMoment.move_number}... {selectedMoment.best_san || 'Candidate move'}</strong>
+                <strong>{selectedMoment.best_san ? `${movePrefix(selectedMoment)} ${selectedMoment.best_san}` : 'No engine move stored'}</strong>
                 <small>What the coach suggests checking</small>
               </div>
             </div>

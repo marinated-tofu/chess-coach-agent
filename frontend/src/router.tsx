@@ -11,25 +11,35 @@ import {
 import {
   Activity,
   AlertCircle,
-  BookOpenCheck,
   Database,
   Library,
+  Lightbulb,
   Loader2,
   Home,
+  Microscope,
+  Swords,
   Target,
   TrendingUp,
   Upload
 } from 'lucide-react';
-import { AnalysisPanel } from './components/AnalysisPanel';
 import { GameList } from './components/GameList';
-import { GamePanel } from './components/GamePanel';
 import { MonitoringDashboard } from './components/MonitoringDashboard';
-import type { CoachAnalysis, CriticalMoment, Platform } from './lib/types';
-import { useWorkspace } from './workspace/WorkspaceContext';
+import type { CoachAnalysis, Platform } from './lib/types';
+import { analyzedGamesKey, useWorkspace } from './workspace/WorkspaceContext';
 import { HomePage } from './pages/HomePage';
 import { ProgressPage } from './pages/ProgressPage';
+import { InsightsPage } from './pages/InsightsPage';
 import { PracticePage } from './pages/PracticePage';
-import { createTrainingSession, getAnalyzedGames } from './lib/api';
+import { GameReviewPage } from './pages/GameReviewPage';
+import { AnalysisBoardPage } from './pages/AnalysisBoardPage';
+import { SetupPositionPage } from './pages/SetupPositionPage';
+import { ScanLine } from 'lucide-react';
+import { PlayPage } from './pages/PlayPage';
+import { RepertoirePage } from './pages/RepertoirePage';
+import { BookMarked } from 'lucide-react';
+import { PageHeader } from './components/PageHeader';
+import { AccountButton } from './components/AccountButton';
+import { getAnalyzedGames } from './lib/api';
 
 function AppShell() {
   const { analyses } = useWorkspace();
@@ -54,29 +64,33 @@ function AppShell() {
           <Link to="/progress" activeProps={{ className: 'active' }}>
             <TrendingUp size={18} /><span>Progress</span>
           </Link>
+          <Link to="/insights" activeProps={{ className: 'active' }}>
+            <Lightbulb size={18} /><span>Insights</span>
+          </Link>
+          <Link to="/analysis" search={{ fen: undefined }} activeProps={{ className: 'active' }}>
+            <Microscope size={18} /><span>Analysis</span>
+          </Link>
+          <Link to="/setup" activeProps={{ className: 'active' }}>
+            <ScanLine size={18} /><span>Set up position</span>
+          </Link>
+          <Link to="/play" search={{ fen: undefined }} activeProps={{ className: 'active' }}>
+            <Swords size={18} /><span>Play</span>
+          </Link>
+          <Link to="/repertoire" activeProps={{ className: 'active' }}>
+            <BookMarked size={18} /><span>Repertoire</span>
+          </Link>
         </nav>
+        <AccountButton />
       </aside>
       <div className="app-content"><Outlet /></div>
     </div>
   );
 }
 
-function PageHeader({ eyebrow, title, detail, actions }: {
-  eyebrow: string;
-  title: string;
-  detail?: string;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <header className="page-header">
-      <div>
-        <span className="page-eyebrow">{eyebrow}</span>
-        <h1>{title}</h1>
-        {detail && <p>{detail}</p>}
-      </div>
-      {actions && <div className="page-actions">{actions}</div>}
-    </header>
-  );
+function GameReviewRoutePage() {
+  const { gameId } = gameRoute.useParams();
+  const search = gameRoute.useSearch();
+  return <GameReviewPage key={gameId} gameId={gameId} momentId={search.moment} />;
 }
 
 function GameIntake({ onAnalyzed }: { onAnalyzed: (analysis: CoachAnalysis) => void }) {
@@ -88,8 +102,8 @@ function GameIntake({ onAnalyzed }: { onAnalyzed: (analysis: CoachAnalysis) => v
   }
 
   async function syncAll() {
-    const first = await workspace.syncAllGames();
-    if (first) onAnalyzed(first);
+    // Stay on the library: the refreshed list and the sync summary show the result.
+    await workspace.syncAllGames();
   }
 
   return (
@@ -149,17 +163,23 @@ function GamesPage() {
   const { analyses, activeGameId, openGame } = workspace;
   const navigate = gamesRoute.useNavigate();
   const search = gamesRoute.useSearch();
-  const showImport = search.import || analyses.length === 0;
+  // Wait for typing to settle before loading a (possibly very large) game library.
+  const [libraryPlayer, setLibraryPlayer] = useState(workspace.player);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setLibraryPlayer(workspace.player), 400);
+    return () => window.clearTimeout(timer);
+  }, [workspace.player]);
   const persisted = useQuery({
-    queryKey: ['analyzed-games', workspace.platform, workspace.player],
-    queryFn: () => getAnalyzedGames(workspace.player, workspace.platform),
+    queryKey: analyzedGamesKey(workspace.platform, libraryPlayer),
+    queryFn: () => getAnalyzedGames(libraryPlayer, workspace.platform),
+    enabled: libraryPlayer.trim().length > 0 && !workspace.loading,
     staleTime: 60_000
   });
   useEffect(() => {
-    if (persisted.data?.analyses.length && persisted.data.analyses.length !== analyses.length) {
-      workspace.restoreAnalyses(persisted.data.analyses);
-    }
-  }, [analyses.length, persisted.data]);
+    // The server library is authoritative: it includes synced and pasted games for this player.
+    if (persisted.data) workspace.restoreAnalyses(persisted.data.analyses);
+  }, [persisted.data]);
+  const showImport = search.import || (analyses.length === 0 && !persisted.isFetching);
   const activeIndex = Math.max(0, analyses.findIndex((item) => item.game.game_id === activeGameId));
 
   function selectGame(index: number) {
@@ -182,7 +202,9 @@ function GamesPage() {
       <PageHeader
         eyebrow="Game library"
         title="Your analyzed games"
-        detail={analyses.length ? `${analyses.length} games ready for review.` : 'No games analyzed in this session.'}
+        detail={analyses.length
+          ? `${analyses.length} games ready for review.`
+          : persisted.isFetching ? 'Loading your game library...' : 'No analyzed games yet.'}
         actions={<button
           className="secondary route-action"
           onClick={() => navigate({ search: { import: !showImport } })}
@@ -200,102 +222,6 @@ function GamesPage() {
           </button>
         </section>
       ) : null}
-    </main>
-  );
-}
-
-function gameStats(analysis: CoachAnalysis) {
-  const side = analysis.game.player_color === 'unknown' ? 'player' : analysis.game.player_color;
-  return [
-    `${analysis.moves.length} plies`,
-    `${analysis.moments.length} moments`,
-    `${analysis.game.player_result} as ${side}`,
-    analysis.game.player_elo ? `${analysis.game.player_elo} Elo` : analysis.game.time_control || 'PGN'
-  ];
-}
-
-function GameReviewPage() {
-  const { gameId } = gameRoute.useParams();
-  const search = gameRoute.useSearch();
-  const navigate = gameRoute.useNavigate();
-  const workspace = useWorkspace();
-  const analysis = workspace.analyses.find((item) => item.game.game_id === gameId) || null;
-  const selectedMoment = analysis?.moments.find((moment) => moment.id === search.moment) || analysis?.moments[0] || null;
-  const [currentPly, setCurrentPly] = useState(selectedMoment?.ply || 0);
-  const [startingPractice, setStartingPractice] = useState(false);
-
-  useEffect(() => {
-    if (analysis) workspace.openGame(analysis.game.game_id);
-  }, [analysis?.game.game_id]);
-
-  useEffect(() => {
-    setCurrentPly(selectedMoment?.ply || 0);
-    workspace.clearFeedbackStatus();
-  }, [selectedMoment?.id]);
-
-  function selectMoment(moment: CriticalMoment) {
-    setCurrentPly(moment.ply);
-    workspace.clearFeedbackStatus();
-    void navigate({ search: { moment: moment.id }, replace: true });
-  }
-
-  async function openPractice() {
-    if (!analysis || !selectedMoment) return;
-    setStartingPractice(true);
-    try {
-      const created = await createTrainingSession(
-        workspace.player,
-        workspace.platform,
-        selectedMoment.theme,
-        selectedMoment.id
-      );
-      await navigate({ to: '/practice/$sessionId', params: { sessionId: created.id } });
-    } finally {
-      setStartingPractice(false);
-    }
-  }
-
-  if (!analysis) {
-    return (
-      <main className="route-page">
-        <section className="empty-route">
-          <BookOpenCheck size={28} />
-          <h2>Review unavailable</h2>
-          <p>This game is not in the current browser session.</p>
-          <Link className="primary" to="/games" search={{ import: false }}>Back to games</Link>
-        </section>
-      </main>
-    );
-  }
-
-  return (
-    <main className="route-page review-page">
-      <PageHeader
-        eyebrow={`${analysis.game.date} · ${analysis.game.player_result}`}
-        title={`${analysis.game.white} vs ${analysis.game.black}`}
-        actions={<>
-          <button className="secondary route-action" disabled={startingPractice} onClick={openPractice}>
-            <Target size={16} /> Train this position
-          </button>
-          <Link className="secondary route-action" to="/games" search={{ import: false }}><Library size={16} /> All games</Link>
-        </>}
-      />
-      <div className="stat-row">{gameStats(analysis).map((stat) => <span key={stat}>{stat}</span>)}</div>
-      <div className="layout review-layout">
-        <AnalysisPanel
-          analysis={analysis}
-          selectedMoment={selectedMoment}
-          onSelectMoment={selectMoment}
-          onFeedback={workspace.recordFeedback}
-          feedbackStatus={workspace.feedbackStatus}
-        />
-        <GamePanel
-          analysis={analysis}
-          selectedMoment={selectedMoment}
-          currentPly={currentPly}
-          setCurrentPly={setCurrentPly}
-        />
-      </div>
     </main>
   );
 }
@@ -346,7 +272,7 @@ const gameRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     moment: typeof search.moment === 'string' ? search.moment : undefined
   }),
-  component: GameReviewPage
+  component: GameReviewRoutePage
 });
 const practiceRoute = createRoute({ getParentRoute: () => rootRoute, path: '/practice', component: PracticePage });
 const practiceSessionRoute = createRoute({ getParentRoute: () => rootRoute, path: '/practice/$sessionId', component: PracticeSessionRoutePage });
@@ -361,11 +287,34 @@ const retiredCoachSessionRoute = createRoute({
   beforeLoad: () => { throw redirect({ to: '/practice' }); }
 });
 const progressRoute = createRoute({ getParentRoute: () => rootRoute, path: '/progress', component: ProgressPage });
+const insightsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/insights', component: InsightsPage });
+const analysisRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/analysis',
+  validateSearch: (search: Record<string, unknown>) => ({ fen: typeof search.fen === 'string' ? search.fen : undefined }),
+  component: function AnalysisRoutePage() {
+    const { fen } = analysisRoute.useSearch();
+    return <AnalysisBoardPage key={fen ?? 'start'} initialFen={fen} />;
+  }
+});
+const playRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/play',
+  validateSearch: (search: Record<string, unknown>) => ({ fen: typeof search.fen === 'string' ? search.fen : undefined }),
+  component: function PlayRoutePage() {
+    const { fen } = playRoute.useSearch();
+    return <PlayPage key={fen ?? 'start'} initialFen={fen} />;
+  }
+});
 const qualityRoute = createRoute({ getParentRoute: () => rootRoute, path: '/quality', component: QualityPage });
 
+const repertoireRoute = createRoute({ getParentRoute: () => rootRoute, path: '/repertoire', component: RepertoirePage });
+const setupRoute = createRoute({ getParentRoute: () => rootRoute, path: '/setup', component: SetupPositionPage });
 const routeTree = rootRoute.addChildren([
+  setupRoute,
+  repertoireRoute,
   indexRoute, analyzeRoute, gamesRoute, gameRoute, practiceRoute, practiceSessionRoute,
-  retiredCoachRoute, retiredCoachSessionRoute, progressRoute, qualityRoute
+  retiredCoachRoute, retiredCoachSessionRoute, progressRoute, insightsRoute, qualityRoute, analysisRoute, playRoute
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: 'intent', scrollRestoration: true });

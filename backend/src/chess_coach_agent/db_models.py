@@ -169,6 +169,12 @@ class TrainingPositionRow(Base):
     theme: Mapped[str] = mapped_column(String(40), index=True)
     difficulty: Mapped[str] = mapped_column(String(20))
     explanation: Mapped[str] = mapped_column(Text, default="")
+    # "game" for positions from the player's own games, "puzzle" for library puzzles.
+    source: Mapped[str] = mapped_column(String(10), default="game", server_default="game")
+    puzzle_id: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Full solution line in UCI, starting with the player's move (puzzles only).
+    solution: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
 
 class QuizAttemptRow(Base):
@@ -238,3 +244,44 @@ class SyncJobRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+
+
+class RepertoireRow(Base):
+    __tablename__ = "repertoires"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), index=True)
+    color: Mapped[str] = mapped_column(String(5))
+    name: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class RepertoireMoveRow(Base):
+    __tablename__ = "repertoire_moves"
+    __table_args__ = (UniqueConstraint("repertoire_id", "parent_fen_epd", "uci"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    repertoire_id: Mapped[str] = mapped_column(
+        ForeignKey("repertoires.id", ondelete="CASCADE"), index=True
+    )
+    parent_fen_epd: Mapped[str] = mapped_column(String(100), index=True)
+    san: Mapped[str] = mapped_column(String(12))
+    uci: Mapped[str] = mapped_column(String(5))
+    fen_after: Mapped[str] = mapped_column(String(100))
+    comment: Mapped[str] = mapped_column(Text, default="")
+    # Games where the player's own move here was an inaccuracy/mistake/blunder (seeded lines).
+    mistake_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class RepertoireReviewRow(Base):
+    __tablename__ = "repertoire_reviews"
+
+    move_id: Mapped[str] = mapped_column(
+        ForeignKey("repertoire_moves.id", ondelete="CASCADE"), primary_key=True
+    )
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    interval_days: Mapped[int] = mapped_column(Integer, default=0)
+    ease: Mapped[float] = mapped_column(Float, default=2.5)
+    streak: Mapped[int] = mapped_column(Integer, default=0)
+    last_result: Mapped[str | None] = mapped_column(String(10), nullable=True)

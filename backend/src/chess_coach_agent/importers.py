@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import io
+from urllib.parse import quote
 
 import chess.pgn
 import httpx
@@ -8,18 +10,51 @@ import httpx
 from .models import GamePreview
 from .pgn import parse_pgn_text
 
+USER_AGENT = "chess-coach-agent/0.1 educational capstone"
+PLATFORM_NAMES = {"chess.com": "Chess.com", "lichess": "Lichess"}
+RATE_LIMIT_RETRIES = 3
+
+
+class ImportSourceError(Exception):
+    """A user-facing failure while fetching games from Chess.com or Lichess."""
+
+
+async def _get(client: httpx.AsyncClient, url: str, platform: str, username: str) -> httpx.Response:
+    name = PLATFORM_NAMES.get(platform, platform)
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        try:
+            response = await client.get(url)
+        except httpx.TimeoutException as exc:
+            raise ImportSourceError(f"{name} did not respond in time. Try again shortly.") from exc
+        except httpx.RequestError as exc:
+            raise ImportSourceError(f"Could not reach {name}: {exc.__class__.__name__}.") from exc
+        if response.status_code != 429 or attempt == RATE_LIMIT_RETRIES:
+            break
+        try:
+            delay = float(response.headers.get("Retry-After", ""))
+        except ValueError:
+            delay = 2.0 * (attempt + 1)
+        await asyncio.sleep(min(delay, 60.0))
+    if response.status_code == 404:
+        raise ImportSourceError(f"{name} player '{username}' was not found.")
+    if response.status_code == 429:
+        raise ImportSourceError(f"{name} is rate limiting requests. Wait a minute and sync again.")
+    if response.status_code >= 400:
+        raise ImportSourceError(f"{name} returned HTTP {response.status_code} for '{username}'.")
+    return response
+
 
 async def fetch_chesscom_pgn(username: str, max_games: int = 20) -> str:
-    headers = {"User-Agent": "chess-coach-agent/0.1 educational capstone"}
-    async with httpx.AsyncClient(timeout=30, headers=headers) as client:
-        archives = await client.get(f"https://api.chess.com/pub/player/{username}/games/archives")
-        archives.raise_for_status()
+    username = username.strip()
+    # Chess.com answers mixed-case usernames with a 301 to the lowercase URL.
+    player_url = f"https://api.chess.com/pub/player/{quote(username.lower(), safe='')}"
+    headers = {"User-Agent": USER_AGENT}
+    async with httpx.AsyncClient(timeout=30, headers=headers, follow_redirects=True) as client:
+        archives = await _get(client, f"{player_url}/games/archives", "chess.com", username)
         urls = archives.json().get("archives", [])
         chunks: list[str] = []
         for url in reversed(urls):
-            pgn_url = url + "/pgn"
-            response = await client.get(pgn_url)
-            response.raise_for_status()
+            response = await _get(client, url + "/pgn", "chess.com", username)
             chunks.append(response.text)
             if sum(chunk.count("[Event ") for chunk in chunks) >= max_games:
                 break
@@ -27,11 +62,14 @@ async def fetch_chesscom_pgn(username: str, max_games: int = 20) -> str:
 
 
 async def fetch_lichess_pgn(username: str, max_games: int = 20) -> str:
-    headers = {"Accept": "application/x-chess-pgn", "User-Agent": "chess-coach-agent/0.1 educational capstone"}
-    url = f"https://lichess.org/api/games/user/{username}?max={max_games}&pgnInJson=false&clocks=true&evals=false"
-    async with httpx.AsyncClient(timeout=45, headers=headers) as client:
-        response = await client.get(url)
-        response.raise_for_status()
+    username = username.strip()
+    headers = {"Accept": "application/x-chess-pgn", "User-Agent": USER_AGENT}
+    url = (
+        f"https://lichess.org/api/games/user/{quote(username, safe='')}"
+        f"?max={max_games}&pgnInJson=false&clocks=true&evals=false"
+    )
+    async with httpx.AsyncClient(timeout=45, headers=headers, follow_redirects=True) as client:
+        response = await _get(client, url, "lichess", username)
         return response.text
 
 

@@ -6,20 +6,24 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 4173"
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "demo": "playwright test -c playwright.demo.config.ts e2e/demo-walkthrough.spec.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-router": "^1.170.16",
     "@vitejs/plugin-react": "^4.3.4",
+    "chess.js": "^1.4.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
+    "react-chessboard": "^5.12.1",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
     "typescript": "^5.6.3",
     "vite": "^6.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3"
   }

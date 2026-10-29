@@ -1,0 +1,163 @@
+/* Coach panel: voice, board annotations, feedback. Base coach chat styles stay in styles.css. */
+
+.coach-head-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.coach-head-actions .icon-button[aria-pressed='true'] {
+  border-color: #198754;
+  color: #146c43;
+  background: #eef8f2;
+}
+
+.coach-board-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-message .coach-board-notes {
+  padding-left: 0;
+}
+
+.coach-board-notes li {
+  padding: 2px 8px;
+  border: 1px solid #dde5eb;
+  border-radius: 999px;
+  color: #1e2935;
+  background: #fff;
+}
+
+.coach-board-notes li span {
+  color: #6b7782;
+}
+
+.coach-board-notes li[data-kind='best'] {
+  border-color: #a7d7bd;
+}
+
+.coach-board-notes li[data-kind='threat'],
+.coach-board-notes li[data-kind='weakness'] {
+  border-color: #efb7ba;
+}
+
+.coach-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.coach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid #cfd9e4;
+  border-radius: 999px;
+  color: #1e2935;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.coach-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.coach-rate {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #5b6672;
+  background: transparent;
+  cursor: pointer;
+}
+
+.coach-rate:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+.coach-thanks {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #146c43;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.coach-rate-error {
+  color: #b4262e;
+  font-size: 13px;
+}
+
+.coach-mic {
+  flex: none;
+  width: 44px;
+  height: auto;
+}
+
+.coach-mic.listening {
+  border-color: #b4262e;
+  color: #fff;
+  background: #b4262e;
+}
+
+.coach-listening {
+  margin: 8px 0 0;
+  color: #b4262e;
+  font-size: 14px;
+}
+
+.coach-chip,
+.coach-rate {
+  transition: transform 160ms ease-out;
+}
+
+.coach-chip:active,
+.coach-rate:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .coach-chip:hover {
+    border-color: #9fb1c2;
+  }
+
+  .coach-rate:not(:disabled):hover {
+    border-color: #dde5eb;
+    color: #1e2935;
+    background: #fff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-chip,
+  .coach-rate {
+    transition: none;
+  }
+
+  .coach-chip:active,
+  .coach-rate:not(:disabled):active {
+    transform: none;
+  }
+}
