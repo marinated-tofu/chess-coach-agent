@@ -16,11 +16,9 @@ Import games -> Detect weaknesses -> Practice -> Evaluate -> Adapt
 
 ## Demo
 
-> Placeholder: a new demo video will be recorded to
-> [`docs/chess-coach-demo.mp4`](docs/chess-coach-demo.mp4). It will show a question to the coach,
-> the agent's tool calls and answer, a practice drill, and the `/quality` monitoring dashboard.
-
-Screenshots (taken in June, before the Coach panel and heatmap were added):
+[`docs/chess-coach-demo.mp4`](docs/chess-coach-demo.mp4) (2 min 40 s) walks through the game
+library, a game review with critical moments and the heatmap, two questions to the coach, a
+Stockfish-graded drill with a coach hint, the progress page and the `/quality` dashboard.
 
 | Dashboard | Game library | Practice |
 | --- | --- | --- |
@@ -46,24 +44,51 @@ This project addresses three gaps:
 
 ## Features
 
+What sets this apart from Chess.com Game Review, Lichess analysis and Aimchess is that every
+screen is built from the player's own games: the coach answers from stored Stockfish evaluations
+of those games, practice drills are the player's own mistakes, and the sparring bot plays the
+openings their real opponents played.
+
+Review and coaching:
+
 - Full-history sync from Chess.com or Lichess (up to 5,000 games) as a background job; games
   already analyzed are skipped. Pasting PGN also works.
-- Stockfish analysis with inaccuracy / mistake / blunder labels
-  ([`docs/moment_selection.md`](docs/moment_selection.md)).
-- Theme detection: loose piece, opening drift, king safety, endgame conversion, missed tactic.
-- **AI coach panel** on the game review page and the practice page (see [AI coach](#ai-coach-agent-and-tools)).
-- **Square-control heatmap** on the game board, with You / Opponent / Both / Off modes, the
-  strongest square and your least-defended piece called out, and a board flip toggle.
-- Practice sessions built from the player's own mistakes, graded with Stockfish, scheduled with
-  spaced repetition.
-- Progress charts: rating, results, theme accuracy, mastery.
-- Helpful / not-helpful feedback on each critical moment, and a `/quality` monitoring dashboard.
+- Move labels (brilliant, great, best, excellent, good, book, inaccuracy, mistake, miss, blunder)
+  and per-side accuracy, both on Lichess win-chance formulas
+  ([`docs/moment_selection.md`](docs/moment_selection.md)). Clock times from `%clk` comments mark
+  moves played in time pressure.
+- Game review with an eval bar, eval graph, labeled move list, retry-the-mistake drills and
+  annotated PGN download.
+- Theme detection: loose piece, opening drift, king safety, endgame conversion, missed tactic,
+  time pressure.
+- **AI coach panel** on the review, practice and analysis pages (see
+  [AI coach](#ai-coach-agent-and-tools)). It draws arrows and highlights on the board (checked
+  for legality with python-chess), can read its answer aloud, and takes helpful / not-helpful
+  feedback.
+- Square-control heatmap with You / Opponent / Both / Off modes.
+
+Training:
+
+- Practice sessions built from the player's own mistakes, mixed with rated Lichess puzzles on the
+  same themes, graded with Stockfish and scheduled with spaced repetition.
+- Opening repertoire builder with a spaced-repetition drill for each line.
+- Eight bots from 600 to 2200 with different styles. They pick moves from Stockfish's candidate
+  list with rating-based noise and occasional blunders, so they lose like people do. A sparring
+  partner replays the moves your past opponents chose in each opening.
+
+Analysis tools:
+
+- Analysis board with variations, Stockfish lines and the Lichess opening explorer.
+- Board from an image: upload, paste or drop a screenshot and a vision model reads the position
+  into an editor.
+- Insights: where points are lost, by theme, phase, color and opening.
+- Progress charts for rating, results, theme accuracy and mastery.
+- Optional sign in with Lichess (OAuth PKCE), and a `/quality` monitoring dashboard.
 
 ## AI coach (agent and tools)
 
 The coach is a PydanticAI `Agent` defined in `backend/src/chess_coach_agent/llm.py`. It runs on
-MiniMax through OpenRouter (model from `OPENROUTER_MODEL`, `minimax/minimax-m3` in `.env.example`
-and `render.yaml`).
+Claude Haiku 5.5 through OpenRouter (`OPENROUTER_MODEL`, default `anthropic/claude-haiku-5.5`).
 
 ### Request flow
 
@@ -199,12 +224,18 @@ Copy `.env.example` to `.env` at the repo root. Every variable is optional.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | empty | Enables the live coach and the LLM judge |
-| `OPENROUTER_MODEL` | `openai/gpt-4o-mini` in code; `minimax/minimax-m3` in `.env.example` | Model for the coach and judge |
+| `OPENROUTER_MODEL` | `anthropic/claude-haiku-5.5` | Model for the coach and judge |
+| `VISION_MODEL` | `google/gemini-3.8-flash` | Reads boards from images. It read 6 of 6 test boards; Haiku read 3 of 6 |
 | `COACH_TIMEOUT_SECONDS` | `60` | Coach run timeout before the fallback answer |
 | `LOGFIRE_TOKEN` | empty | Sends PydanticAI traces to Logfire |
 | `DATABASE_URL` | SQLite at `backend/data/chess_coach.db` | Postgres URL in Docker and Render |
 | `STOCKFISH_PATH` | auto-detect | Path to the Stockfish binary |
 | `STOCKFISH_DEPTH` | `9` | Engine search depth |
+| `STOCKFISH_MAX_NODES` | `60000` | Node cap per analyzed position |
+| `LICHESS_API_TOKEN` | empty | Needed for the opening explorer; Lichess now rejects anonymous explorer requests. Create one at <https://lichess.org/account/oauth/token> with no scopes |
+| `SESSION_SECRET` | empty | Signs the Lichess sign-in cookie; set a long random value in production |
+| `LICHESS_CLIENT_ID` | `chess-coach-agent` | Name shown on the Lichess consent screen |
+| `PUBLIC_BASE_URL` | derived from the request | Origin used for the OAuth redirect URI |
 | `MONITORING_LOG_PATH` | `backend/data/logs/events.jsonl` | JSONL event log |
 | `ENABLE_LOCAL_EMBEDDINGS` | `false` | Compute FastEmbed vectors for vector/hybrid retrieval |
 | `RETRIEVAL_STRATEGY` | from benchmark (`bm25`) | Force `bm25` or `hybrid` |
@@ -294,7 +325,7 @@ offline evaluations, Postgres migrations against a pgvector service, and the fro
 | Ground truth dataset | 11 hand-written positions in `backend/data/eval/critical_moments.jsonl`, each with an expected theme and reviewer notes. Not LLM-generated. | [`docs/manual_evaluation.md`](docs/manual_evaluation.md) |
 | Theme detection | `make eval`: 11/11 expected themes detected | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
 | Retrieval | `make retrieval-eval`: 4 strategies on 20 queries; BM25 selected | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
-| LLM judge | `make eval-llm`: MiniMax scores coaching output against the reviewer notes on theme, grounding, and coaching quality (0-2 each, 6 max) | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
+| LLM judge | `make eval-llm`: the configured OpenRouter model scores coaching output against the reviewer notes on theme, grounding, and coaching quality (0-2 each, 6 max) | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
 | Tuning | The judge compared a concise and a grounded answer format, then flagged a weak opening-drift explanation, which was rewritten | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
 | Live coach | `make eval-coach`: 15 hand-written player questions with Stockfish-verified answers, run through the real coach agent; deterministic checks plus an LLM judge (8 max) compare prompts and models. Haiku 5.5: 6.2/8, expected move 83-92%, about 8 s per answer | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
 | Manual evaluation | Two cases reviewed by hand against the ground truth: 2/2 acceptable, one improvement noted | [`docs/manual_evaluation.md`](docs/manual_evaluation.md) |
@@ -338,8 +369,13 @@ The React app (TanStack Router and Query) has these pages:
 | `/` | Dashboard: rating, weaknesses, due positions, continue training |
 | `/games` | Game library and full-history sync |
 | `/games/:gameId?moment=:id` | Game review: board with square-control heatmap, move list, critical moments, feedback buttons, Coach panel |
-| `/practice`, `/practice/:sessionId` | Board drills graded by Stockfish, with a Coach panel for hints |
+| `/practice`, `/practice/:sessionId` | Board drills and puzzles graded by Stockfish, with a Coach panel for hints |
 | `/progress` | Rating, results, theme accuracy, mastery charts |
+| `/insights` | Where points are lost: themes, phases, colors, openings |
+| `/analysis?fen=` | Analysis board with engine lines, opening explorer and the coach |
+| `/setup` | Board editor and board-from-image reader |
+| `/play?fen=` | Play the bots, then review the game with the coach |
+| `/repertoire` | Build opening lines and drill them |
 | `/quality` | Monitoring dashboard (not in the sidebar) |
 
 The heatmap counts how many pieces of each side attack each square in the current position
