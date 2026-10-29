@@ -1,0 +1,6 @@
+project_id          = "chess-coach-prod"
+billing_account_id  = "01B90D-XXXXXX-XXXXXX"
+region              = "us-central1"
+monthly_budget_usd  = 50
+budget_alert_emails = ["you@example.com"]
+# public_base_url   = "https://chess.roboticscool.com"
