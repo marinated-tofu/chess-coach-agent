@@ -66,6 +66,9 @@ Review and coaching:
   for legality with python-chess), can read its answer aloud, and takes helpful / not-helpful
   feedback.
 - Square-control heatmap with You / Opponent / Both / Off modes.
+- **Practice agent:** with `OPENROUTER_API_KEY` set, starting a practice session runs a PydanticAI
+  agent that ranks the player's stored mistakes and writes the quiz prompt and hint for each
+  position. Without a key it falls back to deterministic ranking and template copy.
 
 Training:
 
@@ -224,7 +227,8 @@ Copy `.env.example` to `.env` at the repo root. Every variable is optional.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | empty | Enables the live coach and the LLM judge |
-| `OPENROUTER_MODEL` | `anthropic/claude-haiku-5.5` | Model for the coach and judge |
+| `OPENROUTER_MODEL` | `anthropic/claude-haiku-5.5` | Model for the coach, practice agent and judge |
+| `CHESSCOM_API_CONTACT`, `LICHESS_API_CONTACT` | placeholder | Contact sent in the User-Agent; Chess.com may answer 403 without one |
 | `VISION_MODEL` | `google/gemini-3.8-flash` | Reads boards from images. It read 6 of 6 test boards; Haiku read 3 of 6 |
 | `COACH_TIMEOUT_SECONDS` | `60` | Coach run timeout before the fallback answer |
 | `LOGFIRE_TOKEN` | empty | Sends PydanticAI traces to Logfire |
@@ -328,6 +332,7 @@ offline evaluations, Postgres migrations against a pgvector service, and the fro
 | LLM judge | `make eval-llm`: the configured OpenRouter model scores coaching output against the reviewer notes on theme, grounding, and coaching quality (0-2 each, 6 max) | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
 | Tuning | The judge compared a concise and a grounded answer format, then flagged a weak opening-drift explanation, which was rewritten | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
 | Live coach | `make eval-coach`: 15 hand-written player questions with Stockfish-verified answers, run through the real coach agent; deterministic checks plus an LLM judge (8 max) compare prompts and models. Haiku 5.5: 6.2/8, expected move 83-92%, about 8 s per answer | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
+| Agent scenarios | `uv run python -m chess_coach_agent.agent_evaluation --dataset data/eval/agent_scenarios.jsonl`: 10 scenarios check the practice agent's tool routing; 10/10 offline (add `--live` for real runs) | [`docs/evaluation_results.md`](docs/evaluation_results.md) |
 | Manual evaluation | Two cases reviewed by hand against the ground truth: 2/2 acceptable, one improvement noted | [`docs/manual_evaluation.md`](docs/manual_evaluation.md) |
 
 Judge results:

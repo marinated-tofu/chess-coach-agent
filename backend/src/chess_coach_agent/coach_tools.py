@@ -7,9 +7,15 @@ from pydantic_ai import RunContext
 from sqlalchemy import select
 
 from .db import session_scope
-from .db_models import CriticalMomentRow, GameRow, PlayerRow
+from .db_models import CriticalMomentRow, GameRow, PlayerRow, TrainingPositionRow
 from .engine import EngineAnalyzer
 from .repositories import player_profile
+from .quiz_copy import (
+    candidate_payload,
+    fetch_practice_candidates,
+    generate_quiz_copy_with_llm,
+    rank_moments_with_llm,
+)
 from .training import build_training_session as create_training_plan
 from .training import evaluate_attempt, quiz_panel
 
@@ -41,6 +47,85 @@ def inspect_game(ctx: RunContext[Any], game_id: str) -> dict[str, Any]:
                 for item in moments
             ],
         }
+
+
+def inspect_player_moments(
+    ctx: RunContext[Any], theme: str = "", limit: int = 10
+) -> list[dict[str, Any]]:
+    """Return stored critical moments for the attached player profile."""
+    ctx.deps.record("inspect_player_moments")
+    if not ctx.deps.platform or not ctx.deps.username:
+        return []
+    with session_scope() as session:
+        moments = fetch_practice_candidates(
+            session,
+            ctx.deps.platform,
+            ctx.deps.username,
+            theme or ctx.deps.practice_theme,
+            limit=min(max(limit, 1), 20),
+        )
+        return [candidate_payload(item) for item in moments]
+
+
+def rank_practice_moments(
+    ctx: RunContext[Any], theme: str = "", position_count: int = 5
+) -> dict[str, Any]:
+    """Rank stored practice moments by player weakness before building a session."""
+    ctx.deps.record("rank_practice_moments")
+    if not ctx.deps.platform or not ctx.deps.username:
+        return {"error": "No persistent player profile is attached"}
+    selected_theme = theme or ctx.deps.practice_theme
+    count = position_count or ctx.deps.practice_position_count
+    with session_scope() as session:
+        candidates = fetch_practice_candidates(
+            session,
+            ctx.deps.platform,
+            ctx.deps.username,
+            selected_theme,
+            limit=20,
+        )
+        if not candidates:
+            return {"error": "Analyze games with engine candidates before ranking practice"}
+        ranked, _ = rank_moments_with_llm(
+            session,
+            ctx.deps.platform,
+            ctx.deps.username,
+            candidates,
+            count,
+        )
+        ctx.deps.ranked_moment_ids = ranked
+        return {"moment_ids": ranked, "count": len(ranked)}
+
+
+def write_quiz_copy(ctx: RunContext[Any], plan_id: str = "") -> dict[str, Any]:
+    """Write grounded quiz prompts and hints for each position in a training plan."""
+    ctx.deps.record("write_quiz_copy")
+    selected_plan = plan_id or ctx.deps.plan_id
+    if not selected_plan:
+        return {"error": "No training plan is attached"}
+    with session_scope() as session:
+        positions = session.scalars(
+            select(TrainingPositionRow)
+            .where(TrainingPositionRow.plan_id == selected_plan)
+            .order_by(TrainingPositionRow.position_order)
+        ).all()
+        if not positions:
+            return {"error": "Training plan has no positions"}
+        copies = []
+        for position in positions:
+            moment = session.get(CriticalMomentRow, position.moment_id) if position.moment_id else None
+            explanation = (moment.explanation or {}) if moment else {}
+            prompt, hint, _ = generate_quiz_copy_with_llm(
+                position.theme,
+                position.explanation or explanation.get("what_happened", ""),
+                explanation.get("principle", ""),
+                position.difficulty,
+            )
+            position.prompt = prompt
+            position.hint = hint
+            copies.append({"position_id": position.id, "prompt": prompt, "hint": hint})
+        session.flush()
+        return {"plan_id": selected_plan, "positions": copies}
 
 
 def compare_moves(
@@ -115,13 +200,23 @@ def build_training_session(
     if not ctx.deps.platform or not ctx.deps.username:
         return {"error": "No persistent player profile is attached"}
     with session_scope() as session:
-        plan = create_training_plan(session, ctx.deps.platform, ctx.deps.username)
+        plan = create_training_plan(
+            session,
+            ctx.deps.platform,
+            ctx.deps.username,
+            ctx.deps.practice_theme,
+            ctx.deps.practice_position_count,
+            ordered_moment_ids=ctx.deps.ranked_moment_ids or None,
+            mode=ctx.deps.practice_mode,
+        )
         player = session.get(PlayerRow, plan.player_id)
         panel = quiz_panel(session, plan.id)
         if panel is None or player is None:
             return {"error": "Analyze games with engine candidates before starting training"}
+        ctx.deps.plan_id = plan.id
         ctx.deps.panel = panel
         return {
+            "plan_id": plan.id,
             "panel": panel.model_dump(mode="json"),
             "player": player_profile(session, player).model_dump(mode="json"),
         }

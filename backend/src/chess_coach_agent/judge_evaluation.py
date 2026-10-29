@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .agent import ChessCoachAgent
-from .llm import complete_with_openrouter
+from .openrouter_client import complete_with_openrouter
 
 
 JudgeCall = Callable[[str, str], Awaitable[tuple[str, bool]]]

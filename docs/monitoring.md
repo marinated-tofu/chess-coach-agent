@@ -17,6 +17,7 @@ Monitoring has two layers:
 | `analysis_completed` | A game finishes analysis | game, moment, and theme counts |
 | `games_sync_completed`, `games_sync_failed` | A full-history sync job ends | job ID, counts or error |
 | `training_session_created` | A practice session starts | session ID, positions, difficulty |
+| `practice_agent_completed` | The practice agent builds a session | `used_llm`, `fallback`, `tools_used`, `duration_ms` |
 | `quiz_attempted` | A practice move is graded | correct, legal, hints used |
 | `moment_feedback` | A user rates a critical moment | moment ID, game ID, theme, FEN, rating, comment |
 | `coach_answered` | The coach answers a question | player, game ID, `used_llm`, tools called |

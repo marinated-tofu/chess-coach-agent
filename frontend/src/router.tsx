@@ -76,7 +76,7 @@ const gamesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/games',
   validateSearch: (search: Record<string, unknown>): { import: boolean; theme?: string } => ({
-    import: search.import === true,
+    import: search.import === true || search.import === 'true',
     ...(typeof search.theme === 'string' && search.theme ? { theme: search.theme } : {})
   }),
   component: GamesPage

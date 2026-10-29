@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import os
 from urllib.parse import quote
 
 import chess.pgn
@@ -9,8 +10,26 @@ import httpx
 
 from .models import GamePreview
 from .pgn import parse_pgn_text
+from .repositories import normalize_username
 
-USER_AGENT = "chess-coach-agent/0.1 educational capstone"
+CHESSCOM_API_BASE = "https://api.chess.com/pub/player"
+LICHESS_GAMES_URL = "https://lichess.org/api/games/user"
+
+
+def chesscom_user_agent() -> str:
+    contact = os.getenv("CHESSCOM_API_CONTACT", "chess-coach-agent@users.noreply.github.com")
+    return f"chess-coach-agent/0.2 (contact: {contact})"
+
+
+def lichess_user_agent() -> str:
+    contact = os.getenv("LICHESS_API_CONTACT", "chess-coach-agent@users.noreply.github.com")
+    return f"chess-coach-agent/0.2 (contact: {contact})"
+
+
+def _http_client(headers: dict[str, str], timeout: float) -> httpx.AsyncClient:
+    return httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True)
+
+
 PLATFORM_NAMES = {"chess.com": "Chess.com", "lichess": "Lichess"}
 RATE_LIMIT_RETRIES = 3
 
@@ -37,6 +56,12 @@ async def _get(client: httpx.AsyncClient, url: str, platform: str, username: str
         await asyncio.sleep(min(delay, 60.0))
     if response.status_code == 404:
         raise ImportSourceError(f"{name} player '{username}' was not found.")
+    if response.status_code == 403 and platform == "chess.com":
+        raise ImportSourceError(
+            "Chess.com returned 403 Forbidden. Set CHESSCOM_API_CONTACT in backend/.env "
+            "(an email or Chess.com username) and retry. Chess.com often blocks cloud-host "
+            "IPs, so sync locally or use Lichess if it keeps failing."
+        )
     if response.status_code == 429:
         raise ImportSourceError(f"{name} is rate limiting requests. Wait a minute and sync again.")
     if response.status_code >= 400:
@@ -45,30 +70,41 @@ async def _get(client: httpx.AsyncClient, url: str, platform: str, username: str
 
 
 async def fetch_chesscom_pgn(username: str, max_games: int = 20) -> str:
-    username = username.strip()
     # Chess.com answers mixed-case usernames with a 301 to the lowercase URL.
-    player_url = f"https://api.chess.com/pub/player/{quote(username.lower(), safe='')}"
-    headers = {"User-Agent": USER_AGENT}
-    async with httpx.AsyncClient(timeout=30, headers=headers, follow_redirects=True) as client:
-        archives = await _get(client, f"{player_url}/games/archives", "chess.com", username)
+    handle = normalize_username(username)
+    headers = {"User-Agent": chesscom_user_agent()}
+    async with _http_client(headers, timeout=30) as client:
+        archives = await _get(
+            client,
+            f"{CHESSCOM_API_BASE}/{quote(handle, safe='')}/games/archives",
+            "chess.com",
+            username,
+        )
         urls = archives.json().get("archives", [])
+        if not urls:
+            return ""
         chunks: list[str] = []
         for url in reversed(urls):
             response = await _get(client, url + "/pgn", "chess.com", username)
             chunks.append(response.text)
             if sum(chunk.count("[Event ") for chunk in chunks) >= max_games:
                 break
+            # Chess.com asks clients not to hammer archive endpoints.
+            await asyncio.sleep(0.15)
     return "\n\n".join(chunks)
 
 
 async def fetch_lichess_pgn(username: str, max_games: int = 20) -> str:
-    username = username.strip()
-    headers = {"Accept": "application/x-chess-pgn", "User-Agent": USER_AGENT}
+    handle = normalize_username(username)
+    headers = {
+        "Accept": "application/x-chess-pgn",
+        "User-Agent": lichess_user_agent(),
+    }
     url = (
-        f"https://lichess.org/api/games/user/{quote(username, safe='')}"
+        f"{LICHESS_GAMES_URL}/{quote(handle, safe='')}"
         f"?max={max_games}&pgnInJson=false&clocks=true&evals=false"
     )
-    async with httpx.AsyncClient(timeout=45, headers=headers, follow_redirects=True) as client:
+    async with _http_client(headers, timeout=45) as client:
         response = await _get(client, url, "lichess", username)
         return response.text
 

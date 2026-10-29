@@ -624,7 +624,7 @@ Thresholds (player who moved):
         </tbody>
       </table>
 
-      <div class="callout" style="margin-top:22px"><b>Intentional divergence from course demos:</b> the capstone retired user-facing coach chat. The shipped loop matches Week 4 testing discipline — ground chess claims in tools and engine output, then use the LLM only where evaluation needs prose quality scoring.</div>
+      <div class="callout" style="margin-top:22px"><b>Intentional divergence from course demos:</b> there is no streaming coach chat UI. The practice page is the agent surface: <code>POST /api/training/sessions</code> runs the PydanticAI tool loop to rank stored moments and write quiz copy. Stockfish still grades every move.</div>
     </section>
 
     <section id="evaluation">
@@ -665,7 +665,7 @@ Thresholds (player who moved):
           <div class="review-list">
             <div class="review-item"><span class="priority done">Done</span><div><b>Removed public LLM/chat routes</b><p>No unauthenticated OpenRouter spend.</p></div></div>
             <div class="review-item"><span class="priority done">Done</span><div><b>Single sync workflow</b><p>Deleted manual game-picker and preview import paths.</p></div></div>
-            <div class="review-item"><span class="priority done">Done</span><div><b>Pruned dead models</b><p>Kept PydanticAI agent for offline evaluation only.</p></div></div>
+            <div class="review-item"><span class="priority done">Done</span><div><b>Practice agent path</b><p>PydanticAI runs on session create with Logfire traces and agent scenario evaluation.</p></div></div>
           </div>
         </div>
         <div>

@@ -2,6 +2,15 @@
 
 Evaluation was run on 2026-06-20 with the hand-written datasets in `backend/data/eval/`.
 
+## Layer overview
+
+| Layer | Module | Latest result |
+| --- | --- | --- |
+| Foundation | `evaluation.py` | **11/11** theme detection on varied fixtures |
+| Retrieval | `retrieval_evaluation.py` | BM25 production default (see below) |
+| Analysis copy | `judge_evaluation.py` | Grounded format **5.5/6** after prompt tuning |
+| Agent | `agent_evaluation.py` | **10/10** offline scenario pass rate (TestModel + heuristic judge) |
+
 The deterministic critical-moment suite was expanded on 2026-06-21 from two manually scored
 coaching cases to 11 regression positions. It currently detects the expected theme in **11/11**
 positions, including loose queens, rooks, bishops, and knights; repeated opening queen moves;
@@ -121,11 +130,24 @@ the run; other work shared the key at the time, so that figure is an upper bound
 Per-question answers, checks, and judge reasons are in `backend/data/eval/coach_results.json`.
 The unit tests (`test_coach_evaluation.py`) run the same pipeline with PydanticAI `TestModel` and a
 fake judge, so they need no network.
+## Agent scenario evaluation
+
+Ten hand-authored scenarios in `agent_scenarios.jsonl` evaluate the PydanticAI agent's tool routing
+and structured answers using course-style `JudgeFeedback` models in `judge.py`. The offline run uses
+expected tool lists plus a heuristic judge so CI stays credential-free:
+
+| Metric | Result |
+| --- | ---: |
+| Scenarios | 10 |
+| Offline pass rate | 100% |
+
+Add `--live` to score real OpenRouter agent runs against the same scenarios.
 
 Commands:
 
 ```bash
 cd backend
+uv run python -m chess_coach_agent.agent_evaluation --dataset data/eval/agent_scenarios.jsonl
 uv run python -m chess_coach_agent.retrieval_evaluation --dataset data/eval/retrieval.jsonl --output data/eval/retrieval_results.json
 uv run python -m chess_coach_agent.judge_evaluation --dataset data/eval/critical_moments.jsonl --tune
 uv run python -m chess_coach_agent.coach_evaluation \

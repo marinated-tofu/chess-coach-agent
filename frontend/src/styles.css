@@ -159,8 +159,6 @@ main {
 
 .intake-workspace {
   display: grid;
-  grid-template-columns: minmax(300px, 0.82fr) 40px minmax(420px, 1.18fr);
-  grid-template-areas: "online divider pgn";
   align-items: stretch;
   padding: 24px;
   border-radius: 8px;
@@ -168,9 +166,12 @@ main {
   box-shadow: var(--shadow-md);
 }
 
+.intake-workspace-single {
+  grid-template-columns: minmax(320px, 1fr);
+  grid-template-areas: "online";
+}
+
 .online-import { grid-area: online; }
-.pgn-import { grid-area: pgn; }
-.intake-divider { grid-area: divider; }
 
 .intake-section {
   display: flex;

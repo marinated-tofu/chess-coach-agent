@@ -20,7 +20,7 @@ from .auth import (
     sign,
     unsign,
 )
-from .importers import USER_AGENT
+from .importers import lichess_user_agent
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -89,7 +89,7 @@ def lichess_login(request: Request, next: str = "/") -> RedirectResponse:
 
 async def _exchange_code(code: str, verifier: str, redirect_uri: str) -> str:
     """Trade the code for a token, read the username, and revoke the token straight away."""
-    headers = {"User-Agent": USER_AGENT}
+    headers = {"User-Agent": lichess_user_agent()}
     async with httpx.AsyncClient(timeout=15, headers=headers) as client:
         token_response = await client.post(
             f"{LICHESS_HOST}/api/token",

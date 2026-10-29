@@ -8,9 +8,8 @@ from textwrap import dedent
 from typing import Any
 
 import chess
-import httpx
 import logfire
-from dotenv import load_dotenv
+from .env_bootstrap import load_project_env  # noqa: F401
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
@@ -26,15 +25,18 @@ from .coach_tools import (
     evaluate_candidate_move,
     generate_position_quiz,
     inspect_game,
+    inspect_player_moments,
+    rank_practice_moments,
+    write_quiz_copy,
 )
 
 
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_URL = f"{OPENROUTER_BASE_URL}/chat/completions"
-# Fastest model in our tool-calling latency check that still grounds answers in tool calls.
-DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
-
-load_dotenv()
+from .openrouter_client import (
+    OPENROUTER_BASE_URL,
+    OPENROUTER_URL,
+    complete_with_openrouter,
+    model_name,
+)
 logfire.configure(
     service_name="chess-coach-agent",
     send_to_logfire="if-token-present",
@@ -51,6 +53,11 @@ class CoachDependencies:
     username: str | None = None
     session_id: str | None = None
     panel: CoachPanel | None = None
+    plan_id: str | None = None
+    practice_theme: str | None = None
+    practice_position_count: int = 5
+    practice_mode: str = "mixed"
+    ranked_moment_ids: list[str] = field(default_factory=list)
     tools_used: list[str] = field(default_factory=list)
     retrieved_titles: list[str] = field(default_factory=list)
 
@@ -59,7 +66,7 @@ class CoachDependencies:
 
 
 def _model_name() -> str:
-    return os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL)
+    return model_name()
 
 
 def estimate_cost(input_tokens: int, output_tokens: int) -> float:
@@ -92,8 +99,10 @@ def search_chess_principles(ctx: RunContext[CoachDependencies], query: str) -> l
 
 
 def inspect_critical_moments(ctx: RunContext[CoachDependencies]) -> list[dict[str, Any]]:
-    """Return grounded engine and heuristic facts from the currently selected game."""
+    """Return grounded engine and heuristic facts from the current or stored game."""
     ctx.deps.record("inspect_critical_moments")
+    if not ctx.deps.analysis and ctx.deps.platform and ctx.deps.username:
+        return inspect_player_moments(ctx)
     if not ctx.deps.analysis:
         return []
     return [
@@ -155,9 +164,9 @@ COACH_INSTRUCTIONS = dedent(
     not already present; do not call tools merely to satisfy a quota.
     Treat engine evaluations, legal moves, and supplied game facts as evidence; never invent a
     variation or claim a move is forced without support. Separate what the player did from the
-    reusable lesson. Give one manageable drill. When the user asks to practice, create a position
-    quiz or training session from their stored games. Use saved-game tools instead of inventing
-    positions. Return the requested structured coaching object.
+    reusable lesson. Give one manageable drill. When the user asks to practice, inspect stored moments, rank
+    them by weakness, create a training session from stored games, then write quiz prompts and
+    hints. Use saved-game tools instead of inventing positions. Return the requested structured coaching object.
     You may add `arrows` and `highlights` for the position on the player's board (the FEN in
     the context). Arrows of kind best, played, or threat must be legal moves in that FEN; illegal
     ones are removed before the player sees them. Use at most 4 arrows and 4 highlights, and
@@ -182,13 +191,16 @@ def create_coach_agent(
         tools=[
             search_chess_principles,
             inspect_critical_moments,
+            inspect_player_moments,
             inspect_position,
             build_training_drill,
             inspect_game,
             compare_moves,
+            rank_practice_moments,
             generate_position_quiz,
             evaluate_candidate_move,
             build_training_session,
+            write_quiz_copy,
         ],
         retries=1,
     )
@@ -356,34 +368,13 @@ def _annotated(response: CoachAskResponse, fen: str | None) -> CoachAskResponse:
     )
 
 
-async def complete_with_openrouter(
-    system: str,
-    prompt: str,
-    temperature: float = 0.0,
-) -> tuple[str, bool]:
-    """Small raw completion helper retained for the independent LLM-judge pipeline."""
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        return "", False
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:5173",
-        "X-Title": "Chess Coach Agent",
-    }
-    body = {
-        "model": _model_name(),
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": temperature,
-    }
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(OPENROUTER_URL, headers=headers, json=body)
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip(), True
-    except Exception:
-        return "", False
+__all__ = [
+    "OPENROUTER_BASE_URL",
+    "OPENROUTER_URL",
+    "CoachDependencies",
+    "ask_coach",
+    "complete_with_openrouter",
+    "create_coach_agent",
+    "estimate_cost",
+    "scrub_fen",
+]

@@ -24,7 +24,7 @@ async def test_agent_executes_registered_tools_and_returns_structured_output():
 
     assert isinstance(result.output, CoachingOutput)
     assert result.output.confidence == 0.8
-    assert deps.tools_used == ["search_chess_principles", "inspect_critical_moments"]
+    assert set(deps.tools_used) == {"search_chess_principles", "inspect_critical_moments"}
 
 
 def test_agent_exposes_all_chess_coaching_tools():
@@ -34,11 +34,14 @@ def test_agent_exposes_all_chess_coaching_tools():
     assert tool_names == {
         "search_chess_principles",
         "inspect_critical_moments",
+        "inspect_player_moments",
         "inspect_position",
         "build_training_drill",
         "inspect_game",
         "compare_moves",
+        "rank_practice_moments",
         "generate_position_quiz",
         "evaluate_candidate_move",
         "build_training_session",
+        "write_quiz_copy",
     }

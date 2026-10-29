@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from .env_bootstrap import load_project_env  # noqa: F401 — loads backend/.env on import
+
 from .agent import ChessCoachAgent, sample_pgn
 from .models import (
     AnalyzeRequest,
@@ -56,7 +58,12 @@ app.include_router(library_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -66,6 +73,21 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/llm/status")
+def llm_status() -> dict[str, object]:
+    from .llm import _openrouter_model
+    from .openrouter_client import model_name, request_timeout
+
+    configured = bool(os.getenv("OPENROUTER_API_KEY"))
+    return {
+        "configured": configured,
+        "model": model_name() if configured else None,
+        "timeout_seconds": request_timeout(),
+        "pydantic_agent_ready": _openrouter_model() is not None if configured else False,
+        "practice_path": "pydantic_agent" if configured else "deterministic_fallback",
+    }
 
 
 @app.get("/api/sample")

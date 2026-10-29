@@ -8,6 +8,9 @@ test:
 	cd backend && uv run pytest -q
 	cd frontend && npm run build
 
+test-e2e:
+	cd frontend && npm install && npx playwright install chromium && npm run build && npm run test:e2e
+
 eval:
 	cd backend && uv run python -m chess_coach_agent.evaluation --dataset data/eval/critical_moments.jsonl
 

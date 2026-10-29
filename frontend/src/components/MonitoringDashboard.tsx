@@ -78,6 +78,18 @@ export function MonitoringDashboard({ refreshKey }: { refreshKey: number }) {
               <strong>{summary.hint_use_rate === null ? 'N/A' : `${Math.round(summary.hint_use_rate * 100)}%`}</strong>
               <span>Hint use</span>
             </div>
+            <div>
+              <strong>{summary.practice_agent_runs ?? 0}</strong>
+              <span>Practice agent runs</span>
+            </div>
+            <div>
+              <strong>
+                {summary.practice_agent_fallback_rate == null
+                  ? 'N/A'
+                  : `${Math.round(summary.practice_agent_fallback_rate * 100)}%`}
+              </strong>
+              <span>Agent fallback</span>
+            </div>
             <div><strong>{count(summary.stream_failures)}</strong><span>Stream failures</span></div>
           </div>
           <div className="event-bars">

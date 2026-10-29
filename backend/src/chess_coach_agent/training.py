@@ -96,6 +96,33 @@ def _puzzle_explanation(puzzle: Puzzle) -> str:
         f"Lichess puzzle {puzzle.id} (rated {puzzle.rating}) for "
         f"{puzzle.theme.replace('_', ' ')}. The solution starts with {puzzle.solution_san}."
     )
+def default_quiz_copy(position: TrainingPositionRow) -> tuple[str, str | None]:
+    theme_label = position.theme.replace("_", " ")
+    if position.source == "puzzle":
+        prompt = f"Lichess puzzle on {theme_label}: find the best move."
+    else:
+        prompt = f"You had a {theme_label} pattern in your game — what would you play?"
+    hint = None
+    if position.difficulty == "beginner":
+        hint = (
+            f"Start with checks and captures, then inspect loose pieces. "
+            f"Theme: {theme_label}."
+        )
+    return prompt, hint
+
+
+def apply_default_quiz_copy(session: Session, plan_id: str) -> None:
+    positions = session.scalars(
+        select(TrainingPositionRow)
+        .where(TrainingPositionRow.plan_id == plan_id)
+        .order_by(TrainingPositionRow.position_order)
+    ).all()
+    for position in positions:
+        if not position.prompt or position.prompt == "What would you play in this position?":
+            prompt, hint = default_quiz_copy(position)
+            position.prompt = prompt
+            position.hint = hint
+    session.flush()
 
 
 def build_training_session(
@@ -106,6 +133,7 @@ def build_training_session(
     position_count: int = 5,
     moment_id: str | None = None,
     mode: str = "mixed",
+    ordered_moment_ids: list[str] | None = None,
 ) -> TrainingPlanRow:
     """Build a practice session.
 
@@ -134,6 +162,11 @@ def build_training_session(
         item for item in candidates if (item.explanation or {}).get("trainable", False)
     ]
     moments = (trainable or candidates)[:position_count]
+    if ordered_moment_ids:
+        by_id = {item.id: item for item in (trainable or candidates)}
+        ranked = [by_id[item_id] for item_id in ordered_moment_ids if item_id in by_id]
+        if ranked:
+            moments = ranked[:position_count]
     if not moments and (theme or moment_id):
         candidates = session.scalars(
             select(CriticalMomentRow)
@@ -164,20 +197,22 @@ def build_training_session(
     session.flush()
     for index, moment in enumerate(moments, start=1):
         correct = moment.best_san or ""
-        session.add(
-            TrainingPositionRow(
-                plan_id=plan.id,
-                moment_id=moment.id,
-                position_order=index,
-                fen=moment.fen_before,
-                correct_move=correct,
-                choices=_move_choices(moment.fen_before, correct, difficulty),
-                theme=moment.theme,
-                difficulty=difficulty,
-                explanation=(moment.explanation or {}).get("what_happened", ""),
-                source="game",
-            )
+        position = TrainingPositionRow(
+            plan_id=plan.id,
+            moment_id=moment.id,
+            position_order=index,
+            fen=moment.fen_before,
+            correct_move=correct,
+            choices=_move_choices(moment.fen_before, correct, difficulty),
+            theme=moment.theme,
+            difficulty=difficulty,
+            explanation=(moment.explanation or {}).get("what_happened", ""),
+            source="game",
         )
+        prompt, hint = default_quiz_copy(position)
+        position.prompt = prompt
+        position.hint = hint
+        session.add(position)
     _add_puzzle_positions(session, plan, puzzles, difficulty, start=len(moments) + 1)
     session.flush()
     return plan
@@ -230,15 +265,16 @@ def quiz_panel(session: Session, plan_id: str, position_id: str | None = None) -
     if not plan_view or not plan_view.positions:
         return None
     position = next((item for item in plan_view.positions if item.id == position_id), plan_view.positions[0])
-    hint = None
     row = session.get(TrainingPositionRow, position.id)
-    if row and position.difficulty == "beginner":
+    hint = row.hint if row else None
+    question = row.prompt if row and row.prompt else "What would you play in this position?"
+    if hint is None and row and position.difficulty == "beginner":
         hint = f"Start with checks and captures. The engine move begins with {row.correct_move[:1]}."
     return QuizPanel(
         training_session_id=plan_id,
         position_id=position.id,
         fen=position.fen,
-        question="What would you play in this position?",
+        question=question,
         choices=position.choices,
         theme=position.theme,
         difficulty=position.difficulty,

@@ -253,12 +253,12 @@ export function PracticePage({ sessionId }: { sessionId?: string }) {
           <button className="secondary" type="button" onClick={() => navigate({ to: '/analysis', search: { fen: position.fen } })}>Open in analysis board</button>
         </> : <>
           <span className="page-eyebrow">Your move</span>
-          <h2>What would you play?</h2>
+          <h2 data-testid="practice-prompt">{position.prompt || 'What would you play?'}</h2>
           <p className="practice-instructions">Play it on the board, or {position.choices.length ? 'pick one of these moves.' : 'type it below.'}</p>
           {grading && <p className="practice-grading" role="status"><Loader2 className="spin" size={15} /> Checking {played?.move.san}…</p>}
           {position.choices.length ? <div className="move-choices" role="group" aria-label="Candidate moves">{position.choices.map((choice) => <button disabled={busy} key={choice} onClick={() => submit(choice)}>{choice}</button>)}</div> : <form className="move-entry" onSubmit={(event) => { event.preventDefault(); if (move) void submit(move); }}><input value={move} onChange={(event) => setMove(event.target.value)} placeholder="Enter SAN or UCI" aria-label="Your move in SAN or UCI" autoComplete="off" spellCheck={false} /><button className="primary" type="submit" disabled={!move || busy}>Submit</button></form>}
-          {position.difficulty === 'beginner' && <button className="text-action" onClick={() => setHintOpen(true)}>Show hint</button>}
-          {hintOpen && <p className="quiz-hint">Start with checks and captures, then inspect every loose piece.</p>}
+          {position.difficulty === 'beginner' && !hintOpen && <button className="text-action" onClick={() => setHintOpen(true)}>Show hint</button>}
+          {hintOpen && <p className="quiz-hint">{position.hint || 'Start with checks and captures, then inspect every loose piece.'}</p>}
         </>}
       </div>
     </section>

@@ -127,12 +127,13 @@ export async function getAnalyzedGames(
 
 export async function startGameSync(
   username: string,
-  platform: Platform
+  platform: Platform,
+  maxGames = 5000
 ): Promise<SyncJob> {
   const response = await fetch('/api/games/sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: username.trim(), platform, max_games: 5000 })
+    body: JSON.stringify({ username: username.trim(), platform, max_games: maxGames })
   });
   if (!response.ok) throw new Error(await errorMessage(response, `Could not sync games from ${platform}`));
   return response.json();

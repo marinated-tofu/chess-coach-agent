@@ -7,7 +7,9 @@
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "demo": "playwright test -c playwright.demo.config.ts e2e/demo-walkthrough.spec.ts"
+    "demo": "playwright test -c playwright.demo.config.ts e2e/demo-walkthrough.spec.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

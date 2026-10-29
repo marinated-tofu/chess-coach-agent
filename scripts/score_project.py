@@ -69,13 +69,16 @@ def score_agents() -> Score:
     tools = [
         "search_chess_principles",
         "inspect_critical_moments",
+        "inspect_player_moments",
         "inspect_position",
         "build_training_drill",
         "inspect_game",
         "compare_moves",
+        "rank_practice_moments",
         "generate_position_quiz",
         "evaluate_candidate_move",
         "build_training_session",
+        "write_quiz_copy",
     ]
     registered_tools = all(term in llm for term in tools)
     pydantic_agent = "from pydantic_ai import Agent" in llm and "output_type=CoachingOutput" in llm
@@ -85,7 +88,7 @@ def score_agents() -> Score:
         "Agents and LLM",
         points,
         3,
-        "PydanticAI lets MiniMax call nine documented tools before structured answer synthesis.",
+        "PydanticAI lets OpenRouter call twelve documented tools before structured answer synthesis.",
     )
 
 

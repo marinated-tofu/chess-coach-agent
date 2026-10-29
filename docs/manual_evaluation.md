@@ -16,3 +16,15 @@ The nine additional deterministic regression fixtures in `critical_moments.jsonl
 
 Manual verdict: **2/2 acceptable**, with one documented improvement opportunity. The LLM judge is a
 second opinion, not a replacement for this review.
+
+## Agent practice runs (manual spot-check)
+
+Three practice-agent scenarios were reviewed manually after wiring the agent to `POST /api/training/sessions`:
+
+| Scenario | Human expectation | Manual result |
+| --- | --- | --- |
+| `practice_session` | Rank stored moments, build session, grounded quiz copy | Pass; tools route to stored DB moments, no invented FENs |
+| `loose_piece_drill` | Prefer loose-piece themes when requested | Pass; prompt references loose-piece pattern |
+| `principle_lookup` | Retrieve lesson snippets for teaching | Pass; answer cites retrieved principles, not fabricated tactics |
+
+Manual agent verdict: **3/3 acceptable** for the practice-only agent surface (no chat UI).

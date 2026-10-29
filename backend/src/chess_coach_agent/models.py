@@ -320,7 +320,7 @@ CoachPanel = Annotated[
 
 
 class TrainingSessionCreate(BaseModel):
-    platform: Platform = "chess.com"
+    platform: Platform = "lichess"
     username: str = "kfctofu"
     theme: str | None = None
     moment_id: str | None = None
@@ -337,7 +337,8 @@ class TrainingPositionView(BaseModel):
     choices: list[str]
     theme: str
     difficulty: Difficulty
-    prompt: str = "What would you play?"
+    prompt: str = "What would you play in this position?"
+    hint: str | None = None
     source: Literal["game", "puzzle"] = "game"
     rating: int | None = None
 

@@ -13,6 +13,8 @@ Durable full-history sync + PGN parser + Stockfish detectors
         v
 Direct practice selection from stored mistakes
         |
+        +--> PydanticAI agent ranks moments + writes quiz copy (fallback: deterministic templates)
+        |
         +--> typed board / quiz / evaluation panel
         |
         v
@@ -23,10 +25,12 @@ Stockfish move grading --> quiz attempt --> review schedule --> player memory
 Game review or practice board --> Coach panel --> POST /api/coach/ask --> PydanticAI agent + 9 tools
 ```
 
-Stockfish and deterministic legality checks are authoritative for chess claims. Importing,
-practice selection, move grading, and review scheduling never wait for an LLM. The LLM is used in
-two places: the coach, which answers the player's questions on the game review and practice pages,
-and the offline LLM judge.
+Stockfish and deterministic legality checks are authoritative for chess claims. Importing, move
+grading, and review scheduling never wait for an LLM. The LLM is used in three places: the coach,
+which answers the player's questions on the game review and practice pages; practice session
+creation, where a PydanticAI agent ranks stored moments and writes grounded quiz prompts when
+`OPENROUTER_API_KEY` is set (falling back to deterministic selection and template copy when the key
+is absent or the agent fails); and the offline LLM judge.
 
 ## Storage
 
@@ -81,6 +85,7 @@ state plus the offline analysis cache.
 | Method | Path | Role |
 | --- | --- | --- |
 | `GET` | `/api/health` | Liveness check for Render and local dev |
+| `GET` | `/api/llm/status` | Whether OpenRouter + PydanticAI practice path is configured |
 | `GET` | `/api/sample` | Bundled sample PGN for empty workspaces |
 | `POST` | `/api/analyze` | Paste/import PGN and persist analyses |
 | `POST` | `/api/feedback` | Helpful / not-helpful ratings on a moment |
