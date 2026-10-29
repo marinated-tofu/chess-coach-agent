@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from .db import session_scope
 from .db_models import GameRow, ReviewScheduleRow, SyncJobRow, TrainingPositionRow
 from .insights import time_category
+from .library_api import player_index
 from .openings_api import _find_player
 from .repositories import load_analyses
 
@@ -187,10 +188,8 @@ def today_summary(session: Session, platform: str, username: str) -> TodaySummar
     player = _find_player(session, platform, username)
     if player is None:
         return TodaySummary(platform=platform, username=username)
-    total = (
-        session.scalar(select(func.count()).select_from(GameRow).where(GameRow.player_id == player.id))
-        or 0
-    )
+    # Same count as the games library, which hides empty "? vs ?" rows.
+    total = len(player_index(session, player).games)
     synced = session.scalar(
         select(SyncJobRow.updated_at)
         .where(SyncJobRow.player_id == player.id, SyncJobRow.status == "complete")

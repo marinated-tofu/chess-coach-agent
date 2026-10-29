@@ -19,6 +19,17 @@ from chess_coach_agent.repositories import get_or_create_player
 
 START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 client = TestClient(app)
+# One real move: the library (and so Today's count) hides games with no moves.
+E4 = {
+    "ply": 1,
+    "move_number": 1,
+    "color": "white",
+    "san": "e4",
+    "uci": "e2e4",
+    "fen_before": START_FEN,
+    "fen_after": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+    "is_player_move": True,
+}
 
 
 def _game(player_id: str, number: int, played_at: str, tc: str, elo: int | None, game_id: int) -> GameRow:
@@ -34,7 +45,7 @@ def _game(player_id: str, number: int, played_at: str, tc: str, elo: int | None,
         played_at=played_at,
         time_control=tc,
         link=f"https://www.chess.com/game/live/{game_id}",
-        metadata_json={"game": {}, "moves": []},
+        metadata_json={"game": {}, "moves": [E4]},
     )
 
 

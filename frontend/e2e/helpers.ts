@@ -8,19 +8,38 @@ const BACKEND = process.env.PLAYWRIGHT_BACKEND_URL || 'http://127.0.0.1:8000';
 
 /**
  * Checks that the backend is up and already holds the demo player's analyzed games
- * (no import or sync is started), then installs a visible fake cursor so clicks are
- * easy to follow in the recording. Returns the featured game id.
+ * (no import or sync is started), signs the browser in as the demo player, then installs
+ * a visible fake cursor so clicks are easy to follow in the recording. Returns the
+ * featured game id.
  */
 export async function prepareDemoWorkspace(page: Page, request: APIRequestContext): Promise<string> {
   const health = await request.get(`${BACKEND}/api/health`);
   expect(health.ok(), 'backend /api/health').toBeTruthy();
 
-  const progress = await request.get(
-    `${BACKEND}/api/progress/${DEMO_PLATFORM}/${encodeURIComponent(DEMO_PLAYER)}`
-  ).catch(() => null);
-  if (progress && !progress.ok()) {
-    console.warn(`progress endpoint returned ${progress.status()}; continuing`);
-  }
+  const today = await request.get(
+    `${BACKEND}/api/today/${DEMO_PLATFORM}/${encodeURIComponent(DEMO_PLAYER)}`,
+    { timeout: 60_000 }
+  );
+  expect(today.ok(), 'backend /api/today').toBeTruthy();
+  const summary = await today.json();
+  expect(summary.total_games, `${DEMO_PLAYER} has analyzed games`).toBeGreaterThan(0);
+
+  // Warm the slower read-only endpoints so the recording does not sit on loading skeletons.
+  const who = `${DEMO_PLATFORM}/${encodeURIComponent(DEMO_PLAYER)}`;
+  await Promise.all([
+    `${BACKEND}/api/library/${who}/progress`,
+    `${BACKEND}/api/progress/${who}`
+  ].map((url) => request.get(url, { timeout: 120_000 }).catch(() => null)));
+
+  // The app keeps the player identity in localStorage; a fresh browser context has none and
+  // would show the "connect your account" card instead of the Today page.
+  await page.addInitScript(([player, platform]) => {
+    try {
+      localStorage.setItem('chess-coach-player', JSON.stringify({ player, platform }));
+    } catch {
+      // Storage unavailable: the Today page will show the connect card and the spec fails loudly.
+    }
+  }, [DEMO_PLAYER, DEMO_PLATFORM] as const);
 
   await page.addInitScript(() => {
     const install = () => {
@@ -89,4 +108,22 @@ export async function showClick(locator: Locator, { linger = 450 }: { linger?: n
 export async function showType(locator: Locator, text: string, delay = 55) {
   await showClick(locator, { linger: 250 });
   await locator.pressSequentially(text, { delay });
+}
+
+/** Clicks a board square by name (works for either orientation). */
+export async function clickSquare(page: Page, square: string, scope?: Locator) {
+  const root = scope ?? page;
+  await showClick(root.locator(`[data-square="${square}"]`).first(), { linger: 250 });
+}
+
+/** Plays a move on an interactive board by clicking the from and to squares. */
+export async function playBoardMove(page: Page, uci: string, scope?: Locator) {
+  await clickSquare(page, uci.slice(0, 2), scope);
+  await page.waitForTimeout(350);
+  await clickSquare(page, uci.slice(2, 4), scope);
+}
+
+/** Desktop sidebar link by its visible label (the label excludes the count badge). */
+export function sidebarLink(page: Page, label: string) {
+  return page.locator(`.app-sidebar a.nav-link[data-label="${label}"]`);
 }

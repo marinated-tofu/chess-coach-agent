@@ -287,7 +287,11 @@ def evaluate_attempt(
         finally:
             analyzer.close()
         if before.score_cp is not None and after.score_cp is not None:
-            cp_loss = round(max(0, before.score_cp - after.score_cp) / 100, 2)
+            # Mate scores are +/-100000; clamp like the classifier so a mating miss reads
+            # as a 10-pawn loss, not 1000.
+            before_cp = max(-1000, min(1000, before.score_cp))
+            after_cp = max(-1000, min(1000, after.score_cp))
+            cp_loss = round(max(0, before_cp - after_cp) / 100, 2)
             correct = correct or cp_loss <= 0.5
 
     attempt = QuizAttemptRow(
