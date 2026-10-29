@@ -67,6 +67,15 @@ export async function smoothScrollTo(locator: Locator, waitMs = 900) {
 /** Glides the fake cursor to an element, lingers briefly, then clicks it. */
 export async function showClick(locator: Locator, { linger = 450 }: { linger?: number } = {}) {
   const page = locator.page();
+  // Smooth-scroll to the target first when it is off screen, so the viewer sees the move.
+  const offscreen = await locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return r.top < 0 || r.bottom > window.innerHeight;
+  });
+  if (offscreen) {
+    await locator.evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    await page.waitForTimeout(800);
+  }
   await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   if (box) {

@@ -89,24 +89,28 @@ test.describe('Demo walkthrough', () => {
       await showClick(nextMove);
       await pause(page, 1400);
 
-      // 4. Square-control heatmap
+      // 4. Square-control heatmap. The mode buttons may sit below the board, so after
+      // each click glide back up to the board to show the colouring.
       mark('Square-control heatmap');
       const heatmap = page.getByRole('group', { name: 'Square control heatmap' });
-      // Keep the whole board plus the heatmap controls in frame.
-      await page.locator('.heatmap-bar').evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'end' }));
-      await pause(page, 1000);
+      const board = page.getByRole('img', { name: /^Chess board/ }).first();
+      const showBoard = async (ms: number) => {
+        await board.evaluate((el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), undefined, { timeout: 10_000 });
+        await pause(page, ms);
+      };
       for (const label of ['You', 'Opponent', 'Both']) {
         mark(`Heatmap: ${label}`);
         const button = heatmap.getByRole('button', { name: label, exact: true });
         await showClick(button);
         await expect(button).toHaveAttribute('aria-pressed', 'true');
         await expect(page.locator('.heatmap-legend')).toContainText('Strongest');
-        await pause(page, 2600);
+        await pause(page, 1600); // strongest / weakest callouts next to the buttons
+        await showBoard(2400);
       }
 
       mark('Flip board');
       await showClick(page.getByRole('button', { name: 'Flip board' }));
-      await pause(page, 2400);
+      await showBoard(2400);
       await showClick(page.getByRole('button', { name: 'Flip board' }));
       await pause(page, 1200);
 
