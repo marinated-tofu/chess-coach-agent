@@ -23,7 +23,7 @@ now has a daily limit so the product can be sold.
 | Accounts with private data | Shipped | `accounts.py`, `/account`. Lichess sign-in only, for now. |
 | Per-user coach limit | Shipped | Anonymous 5, free 20, paid 200 a day |
 
-The other 21 rows were already shipped; see the code for each feature in the README.
+The other 24 shipped rows were already in place before this work.
 
 ## Still open
 
