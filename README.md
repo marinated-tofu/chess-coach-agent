@@ -75,6 +75,7 @@ Training:
 - Practice sessions built from the player's own mistakes, mixed with rated Lichess puzzles on the
   same themes, graded with Stockfish and scheduled with spaced repetition.
 - Opening repertoire builder with a spaced-repetition drill for each line.
+- Endgame trainer: play out essential positions and endgames you let slip against Stockfish.
 - Eight bots from 600 to 2200 with different styles. They pick moves from Stockfish's candidate
   list with rating-based noise and occasional blunders, so they lose like people do. A sparring
   partner replays the moves your past opponents chose in each opening.
@@ -381,6 +382,7 @@ The React app (TanStack Router and Query) has these pages:
 | `/setup` | Board editor and board-from-image reader |
 | `/play?fen=` | Play the bots, then review the game with the coach |
 | `/repertoire` | Build opening lines and drill them |
+| `/endgames` | Play essential endgames and your own thrown endgames against Stockfish; the engine judges the result and schedules the review |
 | `/quality` | Monitoring dashboard (not in the sidebar) |
 
 The heatmap counts how many pieces of each side attack each square in the current position

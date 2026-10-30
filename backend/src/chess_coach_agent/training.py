@@ -293,6 +293,37 @@ def _parse_move(board: chess.Board, submitted: str) -> chess.Move | None:
             return None
 
 
+def schedule_review(
+    session: Session, player_id: str, position_id: str, correct: bool, hints_used: int = 0
+) -> ReviewScheduleRow:
+    """Move a position's review date: 1 day after a miss, 3 after a hint, else 7 doubling to 30."""
+    schedule = session.scalar(
+        select(ReviewScheduleRow).where(ReviewScheduleRow.position_id == position_id)
+    )
+    now = datetime.now(UTC)
+    if schedule is None:
+        schedule = ReviewScheduleRow(
+            player_id=player_id,
+            position_id=position_id,
+            due_at=now,
+            interval_days=1,
+            consecutive_successes=0,
+        )
+        session.add(schedule)
+    if not correct:
+        schedule.interval_days = 1
+        schedule.consecutive_successes = 0
+    elif hints_used:
+        schedule.interval_days = 3
+        schedule.consecutive_successes += 1
+    else:
+        schedule.consecutive_successes += 1
+        schedule.interval_days = min(30, 7 * (2 ** max(0, schedule.consecutive_successes - 1)))
+    schedule.due_at = now + timedelta(days=schedule.interval_days)
+    session.flush()
+    return schedule
+
+
 def evaluate_attempt(
     session: Session,
     position_id: str,
@@ -342,30 +373,7 @@ def evaluate_attempt(
     )
     session.add(attempt)
 
-    schedule = session.scalar(
-        select(ReviewScheduleRow).where(ReviewScheduleRow.position_id == position.id)
-    )
-    now = datetime.now(UTC)
-    if schedule is None:
-        schedule = ReviewScheduleRow(
-            player_id=plan.player_id,
-            position_id=position.id,
-            due_at=now,
-            interval_days=1,
-            consecutive_successes=0,
-        )
-        session.add(schedule)
-    if not correct:
-        schedule.interval_days = 1
-        schedule.consecutive_successes = 0
-    elif hints_used:
-        schedule.interval_days = 3
-        schedule.consecutive_successes += 1
-    else:
-        schedule.consecutive_successes += 1
-        schedule.interval_days = min(30, 7 * (2 ** max(0, schedule.consecutive_successes - 1)))
-    schedule.due_at = now + timedelta(days=schedule.interval_days)
-    session.flush()
+    schedule = schedule_review(session, plan.player_id, position.id, correct, hints_used)
     recompute_player_memory(session, plan.player_id)
 
     explanation = (

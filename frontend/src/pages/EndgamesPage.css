@@ -1,0 +1,231 @@
+/* Endgames page: drill list + preview, then a play-out screen built on the Play page's layout. */
+
+.endgames-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.endgames-list {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.endgames-counts {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.endgames-counts strong {
+  color: var(--gray-950);
+}
+
+.endgames-group {
+  display: grid;
+  gap: 6px;
+}
+
+.endgames-group h2 {
+  margin: 0 0 2px;
+  color: var(--gray-500);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.endgames-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+  min-height: 56px;
+  padding: 9px 12px;
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
+  background: var(--gray-0);
+  color: var(--gray-950);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+
+.endgames-row.selected {
+  border-color: var(--green-500);
+  box-shadow: inset 0 0 0 1px var(--green-500);
+}
+
+.endgames-row:focus-visible {
+  outline: 2px solid var(--green-500);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .endgames-row:not(.selected):hover {
+    border-color: var(--gray-300);
+  }
+}
+
+.endgames-row-title {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endgames-row-goal {
+  grid-column: 1;
+  color: var(--gray-600);
+  font-size: 13px;
+}
+
+.endgames-chip {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.endgames-chip.due { background: var(--amber-50); color: var(--amber-700); }
+.endgames-chip.passed { background: var(--green-50); color: var(--green-600); }
+.endgames-chip.missed { background: var(--red-50); color: var(--red-600); }
+
+.endgames-note {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 14px;
+  text-wrap: pretty;
+}
+
+.endgames-note a {
+  color: var(--green-500);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.endgames-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 20px;
+  align-items: start;
+  min-width: 0;
+  padding: 16px 20px;
+  border-radius: 8px;
+  background: var(--gray-0);
+  box-shadow: var(--shadow-md);
+}
+
+.endgames-preview-board {
+  min-width: 0;
+}
+
+.endgames-preview-body {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.endgames-preview-body h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  text-wrap: balance;
+}
+
+.endgames-preview-body p {
+  margin: 0;
+  color: var(--gray-700);
+  text-wrap: pretty;
+}
+
+.endgames-preview-body .endgames-meta,
+.endgames-meta {
+  color: var(--gray-600);
+  font-size: 14px;
+}
+
+.endgames-back {
+  margin-bottom: 12px;
+}
+
+.endgames-engine {
+  background: var(--gray-800);
+}
+
+.endgames-goal {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--gray-0);
+  box-shadow: var(--shadow-md);
+}
+
+.endgames-goal strong {
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+
+.endgames-goal p {
+  margin: 0;
+  color: var(--gray-700);
+  text-wrap: pretty;
+}
+
+.play-result.endgames-failed {
+  border-left-color: var(--red-500);
+}
+
+.endgames-result-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.endgames-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--amber-50);
+  color: var(--amber-800);
+  font-size: 14px;
+  text-wrap: pretty;
+}
+
+.endgames-hint svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+@media (max-width: 1180px) {
+  .endgames-preview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .endgames-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The selected position sits above the list on a phone, so the board stays in view. */
+  .endgames-preview {
+    order: -1;
+    padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .endgames-row {
+    transition: none;
+  }
+}

@@ -279,8 +279,9 @@ def recompute_player_memory(session: Session, player_id: str) -> PlayerMemoryRow
     by_theme: dict[str, list[bool]] = {}
     for attempt in attempts:
         position = session.get(TrainingPositionRow, attempt.position_id)
-        # Library puzzles train the theme but do not measure transfer from the player's games.
-        if position and position.source != "puzzle":
+        # Library puzzles and essential endgames train the theme but do not measure transfer
+        # from the player's games.
+        if position and position.source not in ("puzzle", "essential"):
             by_theme.setdefault(position.theme, []).append(attempt.correct)
     memory.quiz_accuracy = {
         theme: round(sum(values) / len(values), 3) for theme, values in by_theme.items()

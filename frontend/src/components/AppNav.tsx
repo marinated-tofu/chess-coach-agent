@@ -5,6 +5,7 @@ import {
   Activity,
   BookMarked,
   Compass,
+  Crown,
   Home,
   Library,
   Lightbulb,
@@ -31,6 +32,7 @@ export type NavPath =
   | '/progress'
   | '/practice'
   | '/repertoire'
+  | '/endgames'
   | '/play'
   | '/analysis'
   | '/setup';
@@ -66,7 +68,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Train',
     items: [
       { to: '/practice', label: 'Practice', icon: Target, hotkey: 'p', badge: 'due' },
-      { to: '/repertoire', label: 'Repertoire', icon: BookMarked, hotkey: 'o' }
+      { to: '/repertoire', label: 'Repertoire', icon: BookMarked, hotkey: 'o' },
+      { to: '/endgames', label: 'Endgames', icon: Crown, hotkey: 'n' }
     ]
   },
   {
