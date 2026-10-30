@@ -30,8 +30,8 @@ The service keeps CPU allocated so the sync worker can run, which bills an insta
 it stays up, idle or not. Three regions probing every 15 minutes means a request about every 5
 minutes, and an idle instance can stay up for 15, so the uptime check will likely keep one running
 all month. With Cloud SQL that is about $65, over the default `monthly_budget_usd` of 50, and the
-kill switch would then detach billing. Before applying, raise the budget or set
-`enable_uptime_check = false`.
+kill switch would then detach billing. So `enable_uptime_check` defaults to `false`. Raise the
+budget before turning it on.
 
 ## First deploy
 
