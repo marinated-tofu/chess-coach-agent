@@ -175,6 +175,8 @@ class TrainingPositionRow(Base):
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Full solution line in UCI, starting with the player's move (puzzles only).
     solution: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    # Time trainer positions only: countdown, original clock use, engine view of the played move.
+    timing: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     prompt: Mapped[str] = mapped_column(Text, default="What would you play in this position?")
     hint: Mapped[str | None] = mapped_column(Text, nullable=True)
 

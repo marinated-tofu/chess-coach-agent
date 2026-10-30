@@ -38,6 +38,11 @@ function GameReviewRoutePage() {
   return <GameReviewPage key={gameId} gameId={gameId} momentId={search.moment} />;
 }
 
+function PracticeRoutePage() {
+  const { mode } = practiceRoute.useSearch();
+  return <PracticePage mode={mode} />;
+}
+
 function PracticeSessionRoutePage() {
   const { sessionId } = practiceSessionRoute.useParams();
   return <PracticePage sessionId={sessionId} />;
@@ -89,7 +94,13 @@ const gameRoute = createRoute({
   }),
   component: GameReviewRoutePage
 });
-const practiceRoute = createRoute({ getParentRoute: () => rootRoute, path: '/practice', component: PracticePage });
+const practiceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/practice',
+  // mode=time opens the time trainer instead of the regular queue.
+  validateSearch: (search: Record<string, unknown>): { mode?: 'time' } => (search.mode === 'time' ? { mode: 'time' } : {}),
+  component: PracticeRoutePage
+});
 const practiceSessionRoute = createRoute({ getParentRoute: () => rootRoute, path: '/practice/$sessionId', component: PracticeSessionRoutePage });
 const retiredCoachRoute = createRoute({
   getParentRoute: () => rootRoute,

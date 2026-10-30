@@ -17,10 +17,12 @@ from .db_models import (
     TrainingPlanRow,
     TrainingPositionRow,
 )
+from .classification import winning_chances
 from .engine import EngineAnalyzer
 from .models import EvaluationPanel, QuizPanel
 from .puzzles import Puzzle, normalize_theme, select_puzzles
 from .repositories import get_or_create_player, recompute_player_memory, training_session_view
+from .time_trainer import ran_out_of_time, timed_result
 
 
 def difficulty_for(session: Session, player: PlayerRow, theme: str) -> str:
@@ -299,6 +301,7 @@ def evaluate_attempt(
     submitted_move: str,
     hints_used: int = 0,
     elapsed_ms: int = 0,
+    timed_out: bool = False,
 ) -> EvaluationPanel:
     position = session.get(TrainingPositionRow, position_id)
     if position is None:
@@ -306,14 +309,18 @@ def evaluate_attempt(
     plan = session.get(TrainingPlanRow, position.plan_id)
     if plan is None:
         raise ValueError("Training plan not found")
+    timing = position.timing
+    timed_out = bool(timing) and ran_out_of_time(timing, timed_out, elapsed_ms)
     board = chess.Board(position.fen)
-    move = _parse_move(board, submitted_move.strip())
-    legal = move is not None
+    move = None if timed_out else _parse_move(board, submitted_move.strip())
+    legal = timed_out or move is not None
     cp_loss = None
     correct = False
+    is_best = False
+    win_chance_loss = None
     if move:
         submitted_san = board.san(move)
-        correct = submitted_san == position.correct_move
+        is_best = correct = submitted_san == position.correct_move
         analyzer = EngineAnalyzer()
         pov = board.turn
         try:
@@ -322,13 +329,28 @@ def evaluate_attempt(
             after = analyzer.analyse(board, pov)
         finally:
             analyzer.close()
-        if before.score_cp is not None and after.score_cp is not None:
+        engine_backed = before.engine_backed and after.engine_backed
+        if before.score_cp is not None and after.score_cp is not None and (engine_backed or not timing):
             # Mate scores are +/-100000; clamp like the classifier so a mating miss reads
             # as a 10-pawn loss, not 1000.
             before_cp = max(-1000, min(1000, before.score_cp))
             after_cp = max(-1000, min(1000, after.score_cp))
             cp_loss = round(max(0, before_cp - after_cp) / 100, 2)
             correct = correct or cp_loss <= 0.5
+            win_chance_loss = max(
+                0.0, winning_chances(before.score_cp) - winning_chances(after.score_cp)
+            )
+            if timing and is_best:
+                # The two searches can disagree by a pawn at this depth; the engine's own
+                # move loses nothing by definition.
+                cp_loss, win_chance_loss = 0.0, 0.0
+
+    time_result = None
+    if timing and legal:
+        time_result = timed_result(timing, elapsed_ms, timed_out, is_best, win_chance_loss)
+        if time_result.verdict != "unavailable":
+            # Same scale the game review labels moves on, so verdict and outcome agree.
+            correct = time_result.verdict in ("best", "good")
 
     attempt = QuizAttemptRow(
         player_id=plan.player_id,
@@ -373,6 +395,8 @@ def evaluate_attempt(
         if correct
         else f"The stronger move is {position.correct_move}. {position.explanation}"
     )
+    if timed_out:
+        explanation = f"Time ran out. The stronger move is {position.correct_move}. {position.explanation}"
     if not legal:
         explanation = "That move is not legal in this position. Check the board and try again."
     return EvaluationPanel(
@@ -385,4 +409,5 @@ def evaluate_attempt(
         cp_loss=cp_loss,
         explanation=explanation,
         next_review_at=schedule.due_at,
+        time_result=time_result,
     )

@@ -123,6 +123,24 @@ export type EvaluationPanel = {
   cp_loss: number | null;
   explanation: string;
   next_review_at: string;
+  time_result?: TimeTrainerResult | null;
+};
+
+export type TimeTrainerResult = {
+  kind: 'rushed' | 'burned';
+  budget_seconds: number;
+  original_seconds: number;
+  typical_seconds: number;
+  played_san: string;
+  played_verdict: string;
+  played_win_pct_loss: number;
+  attempt_seconds: number;
+  timed_out: boolean;
+  verdict: 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blunder' | 'timed_out' | 'unavailable';
+  win_pct_loss: number | null;
+  move_number: number;
+  opponent: string;
+  played_at: string;
 };
 
 type TrainingPosition = {
@@ -135,6 +153,8 @@ type TrainingPosition = {
   prompt: string;
   source?: 'game' | 'puzzle';
   rating?: number | null;
+  /** Time trainer countdown; absent on every other kind of position. */
+  time_budget_seconds?: number | null;
   hint: string | null;
 };
 

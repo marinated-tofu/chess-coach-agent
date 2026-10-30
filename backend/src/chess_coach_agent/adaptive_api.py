@@ -44,6 +44,7 @@ from .repositories import (
     training_session_view,
 )
 from .practice_agent import run_practice_agent
+from .time_trainer import TimeTrainerUnavailable, build_time_session
 from .training import evaluate_attempt
 
 
@@ -253,8 +254,38 @@ def get_player(platform: str, username: str) -> PlayerProfile:
         return player_profile(session, player)
 
 
+def _create_time_session(request: TrainingSessionCreate) -> TrainingSessionView:
+    with session_scope() as session:
+        try:
+            plan = build_time_session(
+                session, request.platform, request.username, request.position_count
+            )
+        except TimeTrainerUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        if plan is None:
+            raise HTTPException(409, "No positions from your games fit the time trainer yet.")
+        view = training_session_view(session, plan.id)
+        if view is None:
+            raise HTTPException(500, "Training session could not be created")
+        log_event(
+            "training_session_created",
+            {
+                "training_session_id": plan.id,
+                "positions": len(view.positions),
+                "puzzles": 0,
+                "mode": request.mode,
+                "difficulty": plan.difficulty,
+            },
+        )
+        return view
+
+
 @router.post("/training/sessions", response_model=TrainingSessionView)
 async def create_training_session(request: TrainingSessionCreate) -> TrainingSessionView:
+    if request.mode == "time":
+        # Stockfish vets every position, so keep it off the event loop. No LLM copy here:
+        # the prompt has to stay neutral, and the verdict comes from the engine.
+        return await asyncio.to_thread(_create_time_session, request)
     with session_scope() as session:
         result = await run_practice_agent(
             session,
@@ -318,6 +349,7 @@ def submit_training_attempt(
                 request.move,
                 request.hints_used,
                 request.elapsed_ms,
+                request.timed_out,
             )
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -329,6 +361,7 @@ def submit_training_attempt(
                 "correct": result.correct,
                 "legal": result.legal,
                 "hints_used": request.hints_used,
+                "timed_out": bool(result.time_result and result.time_result.timed_out),
             },
         )
         return result

@@ -87,6 +87,19 @@ export async function createTrainingSession(
   return response.json();
 }
 
+/** A session of timed positions from the player's own games (practice mode "time"). */
+export async function createTimeTrainerSession(username: string, platform: Platform): Promise<TrainingSession> {
+  const response = await fetch('/api/training/sessions', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, platform, position_count: 5, mode: 'time' })
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { detail?: string } | null;
+    throw new Error(body?.detail || 'Could not start the time trainer');
+  }
+  return response.json();
+}
+
 export async function getTrainingSession(sessionId: string): Promise<TrainingSession> {
   const response = await fetch(`/api/training/sessions/${sessionId}`);
   if (!response.ok) throw new Error('Could not load training session');
@@ -98,11 +111,12 @@ export async function submitTrainingAttempt(
   positionId: string,
   move: string,
   hintsUsed: number,
-  elapsedMs: number
+  elapsedMs: number,
+  timedOut = false
 ): Promise<EvaluationPanel> {
   const response = await fetch(`/api/training/sessions/${trainingSessionId}/attempts`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ position_id: positionId, move, hints_used: hintsUsed, elapsed_ms: elapsedMs })
+    body: JSON.stringify({ position_id: positionId, move, hints_used: hintsUsed, elapsed_ms: elapsedMs, timed_out: timedOut })
   });
   if (!response.ok) throw new Error('Could not evaluate move');
   return response.json();
