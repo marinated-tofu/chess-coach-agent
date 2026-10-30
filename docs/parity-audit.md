@@ -29,7 +29,7 @@ The other 24 shipped rows were already in place before this work.
 
 | Gap | Note |
 | --- | --- |
-| Peer benchmarks (Aimchess) | Left out on purpose. Needs real users before the comparison means anything. |
+| Peer benchmarks (Aimchess) | Partly built, see `docs/peer-benchmarks.md`. Lichess rating percentile is live. Comparisons within this database stay hidden until a rating band has 30 other analyzed players. Nothing external exists for accuracy or blunders, or for Chess.com percentiles. |
 | Live checks | Lichess sign-in and a successful Chess.com link haven't run against the real services. The account migration and quota path haven't run on Postgres. |
 | Limits on other AI routes | The practice agent, study plan note and vision routes have no per-user limit. |
 | Job queue, alerts | Not built. |
