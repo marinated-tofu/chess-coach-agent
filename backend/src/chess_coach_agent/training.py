@@ -439,9 +439,9 @@ def evaluate_attempt(
             win_chance_loss = max(
                 0.0, winning_chances(before.score_cp) - winning_chances(after.score_cp)
             )
-            if timing and is_best:
-                # The two searches can disagree by a pawn at this depth; the engine's own
-                # move loses nothing by definition.
+            if is_best:
+                # Shallow searches can misjudge the answer-key move, sometimes by pawns on a
+                # puzzle's sacrifice; it loses nothing by definition.
                 cp_loss, win_chance_loss = 0.0, 0.0
 
     time_result = None

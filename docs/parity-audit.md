@@ -21,7 +21,8 @@ now has a daily limit so the product can be sold.
 | Weekly study plan | Shipped | `study_plan.py`, on Today |
 | Endgame trainer | Shipped | `endgames.py`, `/endgames` |
 | Accounts with private data | Shipped | `accounts.py`, `/account`. Lichess sign-in only, for now. |
-| Per-user coach limit | Shipped | Anonymous 5, free 20, paid 200 a day |
+| Per-user AI limits | Shipped | Coach: anonymous 5, free 20, paid 200 a day. Practice, plan notes and vision have their own limits. |
+| Durable sync queue, health checks | Shipped | `sync_queue.py`, `/api/health/ready` |
 
 The other 24 shipped rows were already in place before this work.
 
@@ -29,12 +30,15 @@ The other 24 shipped rows were already in place before this work.
 
 | Gap | Note |
 | --- | --- |
-| Peer benchmarks (Aimchess) | Partly built, see `docs/peer-benchmarks.md`. Lichess rating percentile is live. Comparisons within this database stay hidden until a rating band has 30 other analyzed players. Nothing external exists for accuracy or blunders, or for Chess.com percentiles. |
-| Live checks | Lichess sign-in and a successful Chess.com link haven't run against the real services. The account migration and quota path haven't run on Postgres. |
-| Limits on other AI routes | The practice agent, study plan note and vision routes have no per-user limit. |
-| Job queue, alerts | Not built. |
-| Payments | Not built. `plan` exists, but nothing can change it yet. |
+| Peer benchmarks | Partial, on purpose. Lichess players get a live percentile. Comparisons between users stay hidden until a band has 30 other players. Chess.com percentiles have no public source. See [peer-benchmarks.md](peer-benchmarks.md). |
+| Live checks | Lichess sign-in, a successful Chess.com link and the real coach model were not run in the combined walkthrough. |
+| Row locking on Postgres | CI runs the migrations and tests on Postgres; the concurrent queue claim has only been run on SQLite. |
+| Tactics found and missed | Chess.com's Diamond Insights reports these. Not compared with ours yet. |
+| Payments | Not built. Needs your choice of provider. `plan` exists, but nothing can change it yet. |
 | Google Cloud | Written in `infra/gcp`, not applied. Billing is closed. |
+
+Competitor columns were rechecked against primary sources on 31 October 2026. Chess.com, Chessy and
+Chessvision.ai prices stayed unconfirmed.
 
 ## What stays unique
 

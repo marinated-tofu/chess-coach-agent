@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chess Coach Agent — Architecture &amp; LLM Guide</title>
+  <style>
+    :root {
+      --ink: #17211b;
+      --muted: #5d6861;
+      --paper: #f6f7f3;
+      --panel: #ffffff;
+      --line: #d9ded8;
+      --green: #28734f;
+      --green-soft: #dceee3;
+      --amber: #d88921;
+      --amber-soft: #faead3;
+      --red: #b94848;
+      --red-soft: #f4dddd;
+      --cyan: #21758a;
+      --cyan-soft: #d9edf1;
+      --purple: #5b4b9a;
+      --purple-soft: #ebe7f7;
+      --black: #101512;
+      --nav-h: 54px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    a { color: var(--green); }
+    code, .mono {
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: #eef1ec;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: var(--nav-h);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 24px;
+      background: rgba(16, 21, 18, 0.94);
+      color: #eef5ef;
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #2b352f;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    nav a { color: #c8d4cb; text-decoration: none; font-size: 13px; font-weight: 650; }
+    nav a:hover { color: #fff; }
+    nav .brand { color: #fff; font-weight: 800; margin-right: 6px; }
+    main { max-width: 1080px; margin: 0 auto; padding: 42px 28px 80px; }
+    section { margin-bottom: 64px; scroll-margin-top: calc(var(--nav-h) + 18px); }
+    h1 { font-size: clamp(32px, 5vw, 48px); line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 16px; max-width: 820px; }
+    h2 { font-size: clamp(22px, 3vw, 30px); line-height: 1.12; letter-spacing: -0.02em; margin: 0 0 14px; }
+    h3 { font-size: 17px; margin: 0 0 8px; }
+    .lead { font-size: 18px; color: var(--muted); max-width: 760px; margin: 0 0 24px; }
+    .eyebrow { color: var(--green); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+    .rule { width: 56px; height: 4px; background: var(--amber); margin: 22px 0; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .pill { display: inline-block; border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 750; background: var(--green-soft); color: var(--green); }
+    .pill.amber { background: var(--amber-soft); color: #945a0e; }
+    .pill.red { background: var(--red-soft); color: var(--red); }
+    .pill.cyan { background: var(--cyan-soft); color: var(--cyan); }
+    .pill.purple { background: var(--purple-soft); color: var(--purple); }
+    .callout { padding: 14px 17px; border-left: 4px solid var(--amber); background: var(--amber-soft); font-size: 14px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+    .callout.green { border-color: var(--green); background: var(--green-soft); }
+    .callout.red { border-color: var(--red); background: var(--red-soft); }
+    .callout.purple { border-color: var(--purple); background: var(--purple-soft); }
+    .diagram { background: var(--black); color: #eef5ef; border-radius: 8px; padding: 20px; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; white-space: pre; margin: 16px 0; }
+    .flow { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; margin: 18px 0; }
+    .node { flex: 1 1 130px; min-height: 88px; display: grid; align-content: center; text-align: center; padding: 12px; background: white; border: 1px solid var(--line); border-top: 4px solid var(--green); border-radius: 8px; }
+    .node.llm { border-top-color: var(--purple); }
+    .node.det { border-top-color: var(--cyan); }
+    .node b { font-size: 14px; }
+    .node small { color: var(--muted); margin-top: 5px; line-height: 1.3; display: block; }
+    .arrow { display: grid; place-items: center; color: var(--amber); font-size: 22px; font-weight: 900; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; background: white; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 16px 0; }
+    th, td { text-align: left; padding: 11px 13px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { background: #eef1ec; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+    tr:last-child td { border-bottom: 0; }
+    .yes { color: var(--green); font-weight: 700; }
+    .no { color: var(--muted); }
+    .sequence { display: grid; grid-template-columns: 130px 1fr; gap: 0 16px; margin: 16px 0; }
+    .actor { color: var(--muted); font-size: 12px; font-weight: 800; padding-top: 10px; text-align: right; }
+    .event { position: relative; padding: 8px 14px; border-left: 2px solid var(--line); font-size: 14px; margin-bottom: 4px; }
+    .event::before { content: ""; position: absolute; left: -6px; top: 14px; width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+    .event.llm::before { background: var(--purple); }
+    .event.det::before { background: var(--cyan); }
+    .module-list { display: grid; gap: 10px; }
+    .module { display: grid; grid-template-columns: 240px 1fr; gap: 14px; padding: 14px; background: white; border: 1px solid var(--line); border-radius: 8px; }
+    .module .path { font: 12px/1.4 ui-monospace, monospace; color: var(--green); font-weight: 700; }
+    .small { color: var(--muted); font-size: 13px; }
+    footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+    @media (max-width: 800px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .module { grid-template-columns: 1fr; }
+      .sequence { grid-template-columns: 1fr; }
+      .actor { text-align: left; padding-top: 0; }
+      nav { padding: 0 14px; }
+      main { padding: 28px 14px 60px; }
+    }
+  </style>
+</head>
+<body>
+  <nav aria-label="Page sections">
+    <span class="brand">Architecture &amp; LLM</span>
+    <a href="#overview">Overview</a>
+    <a href="#loop">Learning loop</a>
+    <a href="#stack">Stack</a>
+    <a href="#llm">LLM usage</a>
+    <a href="#agent">Pydantic AI</a>
+    <a href="#flows">User flows</a>
+    <a href="#api">API</a>
+    <a href="#ui">UI integration</a>
+    <a href="#files">Files</a>
+  </nav>
+
+  <main>
+    <section id="overview">
+      <div class="eyebrow">Chess Coach Agent</div>
+      <h1>Architecture &amp; how the LLM is used</h1>
+      <p class="lead">This document explains the full system: how games become training drills, where Stockfish is authoritative, and exactly which paths call OpenRouter / Pydantic AI versus deterministic code.</p>
+      <div class="rule"></div>
+      <div class="grid-3">
+        <div class="card">
+          <span class="pill">Local</span>
+          <h3>Dev app</h3>
+          <p><a href="http://127.0.0.1:5173">http://127.0.0.1:5173</a></p>
+          <p class="small">API: <code>127.0.0.1:8000</code></p>
+        </div>
+        <div class="card">
+          <span class="pill cyan">Production</span>
+          <h3>Render deploy</h3>
+          <p><a href="https://chess-coach-agent.onrender.com">chess-coach-agent.onrender.com</a></p>
+          <p class="small">LLM status: <code>/api/llm/status</code></p>
+        </div>
+        <div class="card">
+          <span class="pill purple">Key env</span>
+          <h3>OpenRouter</h3>
+          <p><code>OPENROUTER_API_KEY</code> enables the practice agent path.</p>
+          <p class="small">Model default: <code>minimax/minimax-m3</code></p>
+        </div>
+      </div>
+      <div class="callout purple">
+        <strong>Important:</strong> The game review “Analysis” panel is <em>not</em> LLM-generated. It uses Stockfish + rule-based templates in <code>analysis.py</code>. The LLM is used mainly when you click <strong>Start practice</strong> on the Practice page.
+      </div>
+    </section>
+
+    <section id="loop">
+      <div class="eyebrow">Product loop</div>
+      <h2>The adaptive learning loop</h2>
+      <p>Every feature supports one cycle: import → detect weaknesses → practice → grade → adapt.</p>
+      <div class="flow">
+        <div class="node"><b>Import</b><small>Chess.com / Lichess sync or PGN analyze</small></div>
+        <div class="arrow">→</div>
+        <div class="node det"><b>Detect</b><small>Stockfish + Lichess-style win-chance loss</small></div>
+        <div class="arrow">→</div>
+        <div class="node det"><b>Explain</b><small>Deterministic theme templates + BM25 lessons</small></div>
+        <div class="arrow">→</div>
+        <div class="node llm"><b>Practice</b><small>Pydantic AI ranks + writes quiz copy (optional)</small></div>
+        <div class="arrow">→</div>
+        <div class="node det"><b>Grade</b><small>Stockfish move evaluation — never waits on LLM</small></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Adapt</b><small>Spaced repetition + player memory</small></div>
+      </div>
+      <div class="diagram">Chess.com / Lichess / PGN
+        │
+        ▼
+Durable sync + PGN parser + Stockfish detectors
+        │
+        ├─► games, analyses, critical moments ──► Progress analytics
+        │
+        ▼
+Practice session from stored mistakes
+        │
+        ├─► PydanticAI agent (if OPENROUTER_API_KEY) ranks + quiz copy
+        ├─► fallback: deterministic rank + template / LLM quiz copy
+        │
+        ▼
+Board quiz ──► Stockfish grading ──► review schedule ──► player memory
+        ▲
+        └──────────── adaptive difficulty by theme ────────────┘</div>
+    </section>
+
+    <section id="stack">
+      <div class="eyebrow">System design</div>
+      <h2>Architecture layers</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Frontend (React + Vite)</h3>
+          <ul>
+            <li><strong>TanStack Router</strong> — <code>/</code>, <code>/games</code>, <code>/practice</code>, <code>/progress</code>, <code>/quality</code></li>
+            <li><strong>TanStack Query</strong> — server state for progress, training sessions</li>
+            <li><strong>WorkspaceContext</strong> — player, platform, sync status, analysis cache in sessionStorage</li>
+            <li>No LLM in the browser — only REST calls to <code>/api/*</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Backend (FastAPI + Python)</h3>
+          <ul>
+            <li><code>api.py</code> — health, analyze, feedback, monitoring, LLM status</li>
+            <li><code>adaptive_api.py</code> — sync, games library, training, progress</li>
+            <li><code>analysis.py</code> — deterministic game analysis pipeline</li>
+            <li><code>practice_agent.py</code> + <code>llm.py</code> — Pydantic AI practice path</li>
+            <li><code>engine.py</code> — Stockfish (authoritative for chess claims)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Storage</h3>
+          <ul>
+            <li><strong>Postgres</strong> in production (Render)</li>
+            <li><strong>SQLite</strong> local fallback</li>
+            <li>SQLAlchemy models + Alembic migrations</li>
+            <li>Players keyed by <code>(platform, username)</code></li>
+            <li>pgvector for lesson chunk embeddings (retrieval eval, not live chat)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Retrieval &amp; memory</h3>
+          <ul>
+            <li>BM25 default for lesson snippets attached to analyses</li>
+            <li>Player memory recomputed from imports, moments, quiz attempts</li>
+            <li>Raw PGNs/FENs stored relationally — not embedded as prose</li>
+            <li>20-query retrieval benchmark in <code>retrieval_evaluation.py</code></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="llm">
+      <div class="eyebrow">OpenRouter</div>
+      <h2>Where the LLM is used (and where it is not)</h2>
+      <table>
+        <thead>
+          <tr><th>Feature / path</th><th>Uses LLM?</th><th>How</th><th>Typical speed</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Game review Analysis panel</strong><br><span class="small">What happened, Better plan, Principle, Training plan</span></td>
+            <td class="no">No</td>
+            <td><code>analyze_parsed_game()</code> — Stockfish + string templates in <code>analysis.py</code></td>
+            <td>Seconds (engine-bound)</td>
+          </tr>
+          <tr>
+            <td><strong>Start practice</strong><br><span class="small">Practice page, Home “Continue training”</span></td>
+            <td class="yes">Yes</td>
+            <td>Pydantic AI agent loop via <code>run_practice_agent()</code> when <code>OPENROUTER_API_KEY</code> is set</td>
+            <td>~1–3 min (many LLM round-trips)</td>
+          </tr>
+          <tr>
+            <td><strong>Train this position</strong><br><span class="small">Game review header button</span></td>
+            <td class="no">No</td>
+            <td>Fast path: <code>moment_id</code> set → <code>build_training_session()</code> + template quiz copy only</td>
+            <td>&lt; 1 second</td>
+          </tr>
+          <tr>
+            <td><strong>Agent fallback</strong><br><span class="small">When agent throws or no API key</span></td>
+            <td class="yes">Partial</td>
+            <td><code>rank_moments_with_llm()</code> + <code>apply_llm_quiz_copy()</code> via raw OpenRouter HTTP (not Pydantic AI agent)</td>
+            <td>~1–2 min for 5 positions</td>
+          </tr>
+          <tr>
+            <td><strong>Move grading in practice</strong></td>
+            <td class="no">Never</td>
+            <td>Stockfish in <code>evaluate_attempt()</code></td>
+            <td>Sub-second</td>
+          </tr>
+          <tr>
+            <td><strong>Agent evaluation / judge</strong><br><span class="small">Offline CLI only</span></td>
+            <td class="yes">Yes</td>
+            <td><code>agent_evaluation.py</code>, <code>judge.py</code> — not on user HTTP paths</td>
+            <td>Batch / CI</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        Check readiness: <code>GET /api/llm/status</code> returns <code>pydantic_agent_ready</code> and <code>practice_path</code> (<code>pydantic_agent</code> vs <code>deterministic_fallback</code>).
+      </div>
+    </section>
+
+    <section id="agent">
+      <div class="eyebrow">Pydantic AI</div>
+      <h2>The practice agent</h2>
+      <p>Pydantic AI (<code>pydantic_ai</code>) wraps OpenRouter as an <code>Agent</code> with twelve tools and a structured output schema <code>CoachingOutput</code>.</p>
+
+      <h3>Agent factory — <code>llm.py</code></h3>
+      <div class="diagram">from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.openai import OpenAIChatModel
+
+def create_coach_agent() -> Agent[CoachDependencies, CoachingOutput]:
+    return Agent(
+        _openrouter_model(),              # OpenRouter via OpenAI-compatible API
+        deps_type=CoachDependencies,      # shared state: platform, username, plan_id, tools_used
+        output_type=CoachingOutput,       # Pydantic schema for final LLM response
+        instructions=COACH_INSTRUCTIONS,
+        tools=[                           # 12 tools — see table below
+            search_chess_principles,
+            inspect_critical_moments,
+            inspect_player_moments,
+            inspect_position,
+            build_training_drill,
+            inspect_game,
+            compare_moves,
+            rank_practice_moments,
+            generate_position_quiz,
+            evaluate_candidate_move,
+            build_training_session,
+            write_quiz_copy,
+        ],
+        retries=1,
+    )</div>
+
+      <h3>Twelve agent tools</h3>
+      <table>
+        <thead><tr><th>Tool</th><th>File</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>search_chess_principles</code></td><td>llm.py</td><td>BM25 retrieval from curated lesson chunks</td></tr>
+          <tr><td><code>inspect_critical_moments</code></td><td>llm.py</td><td>Engine facts from current or stored moments</td></tr>
+          <tr><td><code>inspect_position</code></td><td>llm.py</td><td>Stockfish + checks/captures for a FEN</td></tr>
+          <tr><td><code>build_training_drill</code></td><td>llm.py</td><td>Drill text from dominant weakness theme</td></tr>
+          <tr><td><code>inspect_game</code></td><td>coach_tools.py</td><td>One persisted game + its moments</td></tr>
+          <tr><td><code>inspect_player_moments</code></td><td>coach_tools.py</td><td>Stored critical moments for player</td></tr>
+          <tr><td><code>rank_practice_moments</code></td><td>coach_tools.py</td><td>LLM-rank moments by weakness → <code>deps.ranked_moment_ids</code></td></tr>
+          <tr><td><code>write_quiz_copy</code></td><td>coach_tools.py</td><td>LLM quiz prompt + hint per position</td></tr>
+          <tr><td><code>compare_moves</code></td><td>coach_tools.py</td><td>Stockfish compare candidate SANs</td></tr>
+          <tr><td><code>generate_position_quiz</code></td><td>coach_tools.py</td><td>Quiz panel from stored moments</td></tr>
+          <tr><td><code>evaluate_candidate_move</code></td><td>coach_tools.py</td><td>Grade a candidate move</td></tr>
+          <tr><td><code>build_training_session</code></td><td>coach_tools.py</td><td>Create DB plan → <code>deps.plan_id</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Structured output — <code>CoachingOutput</code></h3>
+      <div class="diagram">class CoachingOutput(BaseModel):
+    answer: str              # concise coaching answer (Markdown)
+    evidence: list[str]      # grounded facts from tools / engine
+    recommended_move: str | None
+    principle: str
+    drill: str
+    confidence: float        # 0..1</div>
+      <p class="small">In practice sessions, the important side effects are usually the <strong>tools</strong> (creating <code>plan_id</code>, writing quiz copy), not the final <code>CoachingOutput</code> text returned to the caller.</p>
+
+      <h3>Production entry — <code>practice_agent.py</code></h3>
+      <div class="diagram">POST /api/training/sessions
+    │
+    ▼
+run_practice_agent(session, platform, username, theme, position_count, moment_id)
+    │
+    ├─ moment_id set?  ──YES──► build_training_session() + template copy   [NO agent, ~instant]
+    │
+    └─ moment_id null + OPENROUTER_API_KEY?
+           │
+           ▼
+       agent = create_coach_agent()
+       await agent.run(PRACTICE_AGENT_PROMPT, deps=CoachDependencies(...))
+           │
+           ├─ LLM picks tools in a loop (inspect → rank → build → write_quiz_copy)
+           ├─ deps.plan_id set by build_training_session tool
+           └─ returns CoachingOutput
+           │
+           ▼
+       training_session_view(plan_id) → JSON to frontend
+
+    On failure → deterministic rank + apply_llm_quiz_copy (raw OpenRouter, no agent loop)</div>
+    </section>
+
+    <section id="flows">
+      <div class="eyebrow">Sequences</div>
+      <h2>Two practice buttons compared</h2>
+      <div class="grid-2">
+        <div class="card">
+          <span class="pill purple">Start practice</span>
+          <h3>5-position queue</h3>
+          <div class="sequence">
+            <div class="actor">User</div>
+            <div class="event">Clicks Start practice on <code>/practice</code></div>
+            <div class="actor">Frontend</div>
+            <div class="event"><code>POST /api/training/sessions</code> — no <code>moment_id</code>, <code>position_count: 5</code></div>
+            <div class="actor">Backend</div>
+            <div class="event llm">Pydantic AI agent runs full tool loop</div>
+            <div class="actor">Backend</div>
+            <div class="event llm">LLM writes quiz prompts per position</div>
+            <div class="actor">Frontend</div>
+            <div class="event">Navigate to <code>/practice/{sessionId}</code></div>
+          </div>
+          <p class="small"><strong>Slow</strong> (~1–3 min) but LLM-coached copy.</p>
+        </div>
+        <div class="card">
+          <span class="pill cyan">Train this position</span>
+          <h3>Single moment drill</h3>
+          <div class="sequence">
+            <div class="actor">User</div>
+            <div class="event">On game review, selects a moment tab</div>
+            <div class="actor">User</div>
+            <div class="event">Clicks Train this position</div>
+            <div class="actor">Frontend</div>
+            <div class="event"><code>POST /api/training/sessions</code> with <code>moment_id</code> + theme</div>
+            <div class="actor">Backend</div>
+            <div class="event det">Skips agent — <code>build_training_session(moment_id)</code></div>
+            <div class="actor">Backend</div>
+            <div class="event det">Template quiz: “You had a {theme} pattern…”</div>
+            <div class="actor">Frontend</div>
+            <div class="event">Navigate to <code>/practice/{sessionId}</code></div>
+          </div>
+          <p class="small"><strong>Fast</strong> (&lt;1 s) — no LLM on this path.</p>
+        </div>
+      </div>
+
+      <h3>Game sync flow</h3>
+      <div class="sequence">
+        <div class="actor">User</div>
+        <div class="event">Games → Import → Sync full history</div>
+        <div class="actor">API</div>
+        <div class="event"><code>POST /api/games/sync</code> → job id</div>
+        <div class="actor">Frontend</div>
+        <div class="event">Polls <code>GET /api/games/sync/{id}</code> every 1s</div>
+        <div class="actor">Backend</div>
+        <div class="event det">Fetches up to 5,000 games, analyzes new ones with Stockfish</div>
+        <div class="actor">Backend</div>
+        <div class="event det">Persists games + critical moments to Postgres</div>
+        <div class="actor">Frontend</div>
+        <div class="event"><code>GET /api/games/{platform}/{username}</code> → game library</div>
+      </div>
+
+      <h3>Practice attempt flow</h3>
+      <div class="sequence">
+        <div class="actor">User</div>
+        <div class="event">Submits move (choice button or SAN input)</div>
+        <div class="actor">API</div>
+        <div class="event"><code>POST /api/training/sessions/{id}/attempts</code></div>
+        <div class="actor">Backend</div>
+        <div class="event det">Stockfish grades move — legal? correct? cp loss?</div>
+        <div class="actor">Backend</div>
+        <div class="event">Updates review schedule (1d / 3d / 7d spaced repetition)</div>
+        <div class="actor">Frontend</div>
+        <div class="event">Shows evaluation + Next position / View progress</div>
+      </div>
+    </section>
+
+    <section id="api">
+      <div class="eyebrow">HTTP surface</div>
+      <h2>API routes</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Role</th><th>LLM?</th></tr></thead>
+        <tbody>
+          <tr><td>GET</td><td><code>/api/health</code></td><td>Liveness</td><td class="no">No</td></tr>
+          <tr><td>GET</td><td><code>/api/llm/status</code></td><td>Agent readiness check</td><td class="no">No (meta)</td></tr>
+          <tr><td>POST</td><td><code>/api/analyze</code></td><td>PGN → deterministic analysis</td><td class="no">No</td></tr>
+          <tr><td>POST</td><td><code>/api/feedback</code></td><td>Moment helpful / not helpful</td><td class="no">No</td></tr>
+          <tr><td>GET</td><td><code>/api/monitoring</code></td><td>Quality dashboard metrics</td><td class="no">No</td></tr>
+          <tr><td>POST</td><td><code>/api/games/sync</code></td><td>Start full-history sync job</td><td class="no">No</td></tr>
+          <tr><td>GET</td><td><code>/api/games/sync/{id}</code></td><td>Poll sync progress</td><td class="no">No</td></tr>
+          <tr><td>GET</td><td><code>/api/games/{platform}/{user}</code></td><td>Load analyzed game library</td><td class="no">No</td></tr>
+          <tr><td>POST</td><td><code>/api/training/sessions</code></td><td><strong>Create practice session</strong></td><td class="yes">Yes*</td></tr>
+          <tr><td>GET</td><td><code>/api/training/sessions/{id}</code></td><td>Fetch session positions</td><td class="no">No</td></tr>
+          <tr><td>POST</td><td><code>/api/training/sessions/{id}/attempts</code></td><td>Grade move (Stockfish)</td><td class="no">No</td></tr>
+          <tr><td>GET</td><td><code>/api/progress/{platform}/{user}</code></td><td>Rating, themes, mastery</td><td class="no">No</td></tr>
+        </tbody>
+      </table>
+      <p class="small">* LLM only when <code>moment_id</code> is absent and <code>OPENROUTER_API_KEY</code> is configured; otherwise deterministic fallback (may still use OpenRouter for rank/quiz copy).</p>
+    </section>
+
+    <section id="files">
+      <div class="eyebrow">Code map</div>
+      <h2>Key files</h2>
+      <div class="module-list">
+        <div class="module">
+          <div><div class="path">backend/.../llm.py</div><span class="pill purple">Pydantic AI core</span></div>
+          <div>Agent factory, OpenRouter model, 4 built-in tools, Logfire instrumentation, <code>CoachDependencies</code>.</div>
+        </div>
+        <div class="module">
+          <div><div class="path">backend/.../coach_tools.py</div><span class="pill purple">Agent tools</span></div>
+          <div>8 DB/engine tools: rank moments, build session, write quiz copy, compare moves, etc.</div>
+        </div>
+        <div class="module">
+          <div><div class="path">backend/.../practice_agent.py</div><span class="pill purple">Production agent run</span></div>
+          <div><code>agent.run()</code> call site. Fast path when <code>moment_id</code> is set. Fallback on error.</div>
+        </div>
+        <div class="module">
+          <div><div class="path">backend/.../openrouter_client.py</div><span class="pill">Raw LLM HTTP</span></div>
+          <div>Direct OpenRouter completions for quiz copy ranking and judge — outside Pydantic AI agent loop.</div>
+        </div>
+        <div class="module">
+          <div><div class="path">backend/.../analysis.py</div><span class="pill cyan">Deterministic</span></div>
+          <div>Stockfish analysis + theme detection + template coaching text for game review UI.</div>
+        </div>
+        <div class="module">
+          <div><div class="path">backend/.../quiz_copy.py</div><span class="pill">LLM quiz text</span></div>
+          <div><code>generate_quiz_copy_with_llm()</code>, <code>rank_moments_with_llm()</code>, template fallbacks.</div>
+        </div>
+        <div class="module">
+          <div><div class="path">frontend/src/pages/PracticePage.tsx</div><span class="pill cyan">UI</span></div>
+          <div>Start practice button → <code>createTrainingSession()</code> → board drill UI.</div>
+        </div>
+        <div class="module">
+          <div><div class="path">frontend/src/router.tsx</div><span class="pill cyan">UI</span></div>
+          <div>Game review, sync intake, Train this position → session with <code>moment_id</code>.</div>
+        </div>
+        <div class="module">
+          <div><div class="path">docs/pydantic_ai_map.md</div><span class="pill">Markdown companion</span></div>
+          <div>Annotated code map with line references for every Pydantic AI touchpoint.</div>
+        </div>
+      </div>
+
+      <h3>Environment variables</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>OPENROUTER_API_KEY</code></td><td>Enables Pydantic AI practice agent + LLM quiz/rank fallbacks</td></tr>
+          <tr><td><code>OPENROUTER_MODEL</code></td><td>Model slug (default <code>minimax/minimax-m3</code>)</td></tr>
+          <tr><td><code>OPENROUTER_TIMEOUT_SECONDS</code></td><td>HTTP timeout for OpenRouter calls (default 12)</td></tr>
+          <tr><td><code>DATABASE_URL</code></td><td>Postgres connection (Render) or SQLite locally</td></tr>
+          <tr><td><code>STOCKFISH_DEPTH</code></td><td>Engine search depth (default 7 on Render)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Verify locally</h3>
+      <div class="diagram"># Start dev stack
+make dev
+
+# Check LLM wiring
+cd backend && uv run python scripts/verify_llm.py --live --agent
+
+# Open docs in browser
+open docs/architecture-and-llm.html</div>
+    </section>
+
+    <section id="ui">
+      <div class="eyebrow">Product surface</div>
+      <h2>What is integrated with the UI</h2>
+      <p>Offline evaluation and LLM judges are <strong>not</strong> in the app. This section covers every route, button, and API call the React frontend actually uses.</p>
+
+      <div class="callout green">
+        Full reference: <code>docs/ui-integration.md</code> — page-by-page tables for every control and endpoint.
+      </div>
+
+      <h3>Sidebar routes</h3>
+      <table>
+        <thead><tr><th>Route</th><th>Integrated backend</th><th>LLM?</th></tr></thead>
+        <tbody>
+          <tr><td><code>/</code> Home</td><td><code>GET /api/progress</code>, <code>POST /api/training/sessions</code></td><td class="yes">Start practice → yes</td></tr>
+          <tr><td><code>/games</code></td><td>Sync job + <code>GET /api/games/...</code></td><td class="no">No</td></tr>
+          <tr><td><code>/games/$gameId</code></td><td>Cache only; feedback + train-this-position</td><td class="no">Analysis no; train instant</td></tr>
+          <tr><td><code>/practice</code></td><td>Training sessions + move attempts</td><td class="yes">Start practice → yes</td></tr>
+          <tr><td><code>/progress</code></td><td><code>GET /api/progress</code></td><td class="no">No</td></tr>
+          <tr><td><code>/quality</code> <span class="pill amber">hidden</span></td><td><code>GET /api/monitoring</code></td><td class="no">Displays logs only</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Frontend API calls (<code>lib/api.ts</code>)</h3>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Used by UI</h3>
+          <ul class="small">
+            <li><code>POST /api/feedback</code> — thumbs up/down</li>
+            <li><code>GET /api/monitoring</code> — /quality dashboard</li>
+            <li><code>POST /api/training/sessions</code> — practice create</li>
+            <li><code>GET /api/training/sessions/{id}</code></li>
+            <li><code>POST .../attempts</code> — Stockfish grading</li>
+            <li><code>GET /api/progress/...</code></li>
+            <li><code>GET /api/games/...</code></li>
+            <li><code>POST /api/games/sync</code> + poll job</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Not called from UI</h3>
+          <ul class="small">
+            <li><code>/api/health</code>, <code>/api/llm/status</code></li>
+            <li><code>/api/sample</code>, <code>/api/analyze</code></li>
+            <li><code>/api/players/...</code></li>
+            <li>All eval CLIs (judge, agent_eval, retrieval_eval)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Monitoring — the only eval-adjacent UI feature</h3>
+      <p class="small"><code>/quality</code> is not in the sidebar. Open <a href="http://127.0.0.1:5173/quality">/quality</a> directly. It aggregates JSONL events from normal usage:</p>
+      <table>
+        <thead><tr><th>User action</th><th>Event logged</th></tr></thead>
+        <tbody>
+          <tr><td>Sync games</td><td><code>games_sync_*</code>, <code>analysis_completed</code></td></tr>
+          <tr><td>Thumbs up/down on review</td><td><code>moment_feedback</code></td></tr>
+          <tr><td>Start practice</td><td><code>training_session_created</code>, <code>practice_agent_completed</code></td></tr>
+          <tr><td>Submit move in practice</td><td><code>quiz_attempted</code></td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Stale metrics:</strong> <code>llm_calls</code>, token counts, and chat latency on the dashboard come from retired <code>chat_completed</code> events. Use <code>practice_agent_runs</code> and <code>practice_agent_fallback_rate</code> for current LLM telemetry.
+      </div>
+
+      <h3>Client state (<code>WorkspaceContext</code>)</h3>
+      <p class="small">Player, platform, and up to 25 analyses live in <code>sessionStorage</code>. Server DB is authoritative for sync, training, and progress. Game review reads the browser cache — deep links without prior sync show “Review unavailable.”</p>
+    </section>
+
+    <footer>
+      Chess Coach Agent — AI Engineering Buildcamp capstone.
+      Companion markdown: <code>docs/architecture.md</code>, <code>docs/pydantic_ai_map.md</code>, <code>docs/ui-integration.md</code>.
+      Generated guide — architecture &amp; LLM usage.
+    </footer>
+  </main>
+</body>
+</html>
