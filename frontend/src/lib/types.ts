@@ -176,6 +176,8 @@ export type ProgressSummary = {
   quiz_accuracy: Record<string, number>;
   recent_attempts: number;
   transfer_score: number | null;
+  /** Practice figures were left out: another account owns this player. */
+  private?: boolean;
 };
 
 export type SyncJob = {

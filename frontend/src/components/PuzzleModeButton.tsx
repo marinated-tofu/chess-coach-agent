@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, Puzzle } from 'lucide-react';
 import type { Platform, TrainingSession } from '../lib/types';
+import { errorMessage } from '../lib/api';
 
 type Props = {
   username: string;
@@ -31,7 +32,7 @@ export function PuzzleModeButton({ username, platform, theme, positionCount = 5,
           mode: 'puzzles'
         })
       });
-      if (!response.ok) throw new Error('Could not build a puzzle session');
+      if (!response.ok) throw new Error(await errorMessage(response, 'Could not build a puzzle session'));
       await onStarted(await response.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not build a puzzle session');

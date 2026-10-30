@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from .accounts import Viewer, require_access
 from .db import session_scope
 from .db_models import QuizAttemptRow, TrainingPositionRow
 from .openings_api import _find_player
@@ -115,11 +116,17 @@ def _require(puzzle_id: str) -> Puzzle:
 
 
 def _record(
-    request: PuzzlePlayer, puzzle: Puzzle, finish: PuzzleFinish, submitted: str, correct: bool
+    request: PuzzlePlayer,
+    puzzle: Puzzle,
+    finish: PuzzleFinish,
+    submitted: str,
+    correct: bool,
+    user_id: str | None,
 ) -> None:
     if not (request.record and request.platform and (request.username or "").strip()):
         return
     with session_scope() as session:
+        require_access(session, request.platform, request.username, user_id)
         player = get_or_create_player(session, request.platform, request.username)
         schedule = record_puzzle_attempt(
             session, player, puzzle, submitted, correct, request.elapsed_ms
@@ -129,10 +136,13 @@ def _record(
         finish.streak = schedule.consecutive_successes
 
 
-def _statuses(platform: str | None, username: str | None, ids: list[str]) -> dict[str, str]:
+def _statuses(
+    platform: str | None, username: str | None, ids: list[str], user_id: str | None
+) -> dict[str, str]:
     if not platform or not username or not ids:
         return {}
     with session_scope() as session:
+        require_access(session, platform, username, user_id)
         player = _find_player(session, platform, username)
         if player is None:
             return {}
@@ -166,6 +176,7 @@ def get_catalog() -> PuzzleCatalog:
 
 @router.get("", response_model=PuzzlePage)
 def list_puzzles(
+    user_id: Viewer,
     theme: str | None = None,
     min_rating: int | None = Query(default=None, ge=0, le=4000),
     max_rating: int | None = Query(default=None, ge=0, le=4000),
@@ -176,7 +187,7 @@ def list_puzzles(
 ) -> PuzzlePage:
     matches = filter_puzzles(theme, min_rating, max_rating)
     page = matches[offset : offset + limit]
-    statuses = _statuses(platform, username, [item.id for item in page])
+    statuses = _statuses(platform, username, [item.id for item in page], user_id)
     return PuzzlePage(
         total=len(matches),
         offset=offset,
@@ -196,7 +207,9 @@ def list_puzzles(
 
 
 @router.post("/{puzzle_id}/moves", response_model=PuzzleMoveResult)
-def submit_move(puzzle_id: str, request: PuzzleMoveRequest) -> PuzzleMoveResult:
+def submit_move(
+    puzzle_id: str, request: PuzzleMoveRequest, user_id: Viewer
+) -> PuzzleMoveResult:
     puzzle = _require(puzzle_id)
     try:
         check = check_line(puzzle, request.line)
@@ -205,14 +218,14 @@ def submit_move(puzzle_id: str, request: PuzzleMoveRequest) -> PuzzleMoveResult:
     if check.status == "continue":
         return PuzzleMoveResult(status="continue", reply=check.reply)
     finish = _finish(puzzle)
-    _record(request, puzzle, finish, request.line[-1], check.status == "solved")
+    _record(request, puzzle, finish, request.line[-1], check.status == "solved", user_id)
     return PuzzleMoveResult(status=check.status, finish=finish)
 
 
 @router.post("/{puzzle_id}/reveal", response_model=PuzzleFinish)
-def reveal_solution(puzzle_id: str, request: PuzzlePlayer) -> PuzzleFinish:
+def reveal_solution(puzzle_id: str, request: PuzzlePlayer, user_id: Viewer) -> PuzzleFinish:
     """Show the answer. Looking it up on a first run counts as a miss."""
     puzzle = _require(puzzle_id)
     finish = _finish(puzzle)
-    _record(request, puzzle, finish, "revealed", False)
+    _record(request, puzzle, finish, "revealed", False, user_id)
     return finish

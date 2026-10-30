@@ -19,6 +19,7 @@ import { SetupPositionPage } from './pages/SetupPositionPage';
 import { PlayPage } from './pages/PlayPage';
 import { RepertoirePage } from './pages/RepertoirePage';
 import { EndgamesPage } from './pages/EndgamesPage';
+import { AccountPage } from './pages/AccountPage';
 import { PageHeader } from './components/PageHeader';
 import { AppNav } from './components/AppNav';
 import { SyncToast } from './components/SyncToast';
@@ -154,11 +155,13 @@ const puzzlesRoute = createRoute({
 const repertoireRoute = createRoute({ getParentRoute: () => rootRoute, path: '/repertoire', component: RepertoirePage });
 const endgamesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/endgames', component: EndgamesPage });
 const setupRoute = createRoute({ getParentRoute: () => rootRoute, path: '/setup', component: SetupPositionPage });
+const accountRoute = createRoute({ getParentRoute: () => rootRoute, path: '/account', component: AccountPage });
 const routeTree = rootRoute.addChildren([
   setupRoute,
   repertoireRoute,
   endgamesRoute,
   puzzlesRoute,
+  accountRoute,
   indexRoute, analyzeRoute, gamesRoute, gameRoute, practiceRoute, practiceSessionRoute,
   retiredCoachRoute, retiredCoachSessionRoute, progressRoute, insightsRoute, qualityRoute, analysisRoute, playRoute
 ]);

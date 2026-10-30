@@ -5,9 +5,17 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from sqlalchemy import select
 
+from .accounts import Viewer, can_access, public_profile, require_access, require_player
+from .coach_limits import (
+    QuotaScope,
+    give_back_question,
+    limit_reached,
+    quota_scope,
+    take_question,
+)
 from .db import session_scope
 from .agent import ChessCoachAgent
 from .analysis import ANALYSIS_VERSION
@@ -251,10 +259,13 @@ def get_analyzed_games(
 
 
 @router.get("/players/{platform}/{username}", response_model=PlayerProfile)
-def get_player(platform: str, username: str) -> PlayerProfile:
+def get_player(platform: str, username: str, user_id: Viewer) -> PlayerProfile:
     with session_scope() as session:
         player = get_or_create_player(session, platform, username)
-        return player_profile(session, player)
+        profile = player_profile(session, player)
+        if can_access(session, platform, username, user_id):
+            return profile
+        return public_profile(profile)
 
 
 def _create_time_session(request: TrainingSessionCreate) -> TrainingSessionView:
@@ -284,7 +295,11 @@ def _create_time_session(request: TrainingSessionCreate) -> TrainingSessionView:
 
 
 @router.post("/training/sessions", response_model=TrainingSessionView)
-async def create_training_session(request: TrainingSessionCreate) -> TrainingSessionView:
+async def create_training_session(
+    request: TrainingSessionCreate, user_id: Viewer
+) -> TrainingSessionView:
+    with session_scope() as session:
+        require_access(session, request.platform, request.username, user_id)
     if request.mode == "time":
         # Stockfish vets every position, so keep it off the event loop. No LLM copy here:
         # the prompt has to stay neutral, and the verdict comes from the engine.
@@ -326,11 +341,12 @@ async def create_training_session(request: TrainingSessionCreate) -> TrainingSes
 
 
 @router.get("/training/sessions/{training_session_id}", response_model=TrainingSessionView)
-def get_training_session(training_session_id: str) -> TrainingSessionView:
+def get_training_session(training_session_id: str, user_id: Viewer) -> TrainingSessionView:
     with session_scope() as session:
         view = training_session_view(session, training_session_id)
         if view is None:
             raise HTTPException(404, "Training session not found")
+        require_player(session, view.player_id, user_id)
         return view
 
 
@@ -339,12 +355,13 @@ def get_training_session(training_session_id: str) -> TrainingSessionView:
     response_model=EvaluationPanel,
 )
 def submit_training_attempt(
-    training_session_id: str, request: QuizAttemptCreate
+    training_session_id: str, request: QuizAttemptCreate, user_id: Viewer
 ) -> EvaluationPanel:
     with session_scope() as session:
         view = training_session_view(session, training_session_id)
         if view is None or request.position_id not in {item.id for item in view.positions}:
             raise HTTPException(404, "Training position not found in this session")
+        require_player(session, view.player_id, user_id)
         try:
             result = evaluate_attempt(
                 session,
@@ -371,9 +388,20 @@ def submit_training_attempt(
 
 
 @router.get("/progress/{platform}/{username}", response_model=ProgressSummary)
-def get_progress(platform: str, username: str) -> ProgressSummary:
+def get_progress(platform: str, username: str, user_id: Viewer) -> ProgressSummary:
     with session_scope() as session:
-        return progress_summary(session, platform, username)
+        summary = progress_summary(session, platform, username)
+        if can_access(session, platform, username, user_id):
+            return summary
+        return summary.model_copy(
+            update={
+                "player": public_profile(summary.player),
+                "quiz_accuracy": {},
+                "recent_attempts": 0,
+                "transfer_score": None,
+                "private": True,
+            }
+        )
 
 
 def _player_memory_context(session, player_id: str) -> str:
@@ -393,27 +421,50 @@ def _player_memory_context(session, player_id: str) -> str:
 
 
 @router.post("/coach/ask", response_model=CoachAskResponse)
-async def ask_coach_route(request: CoachAskRequest) -> CoachAskResponse:
-    def load_context() -> tuple[str, CoachAnalysis | None]:
+async def ask_coach_route(
+    request: CoachAskRequest, http_request: Request, user_id: Viewer
+) -> CoachAskResponse:
+    def take_quota() -> QuotaScope:
         with session_scope() as session:
-            player = get_or_create_player(session, request.platform, request.username)
-            memory = _player_memory_context(session, player.id)
-            if request.game_id is None:
-                return memory, None
-            analyses = load_analyses(session, request.platform, request.username, request.game_id).analyses
-            return memory, analyses[0] if analyses else None
+            scope = quota_scope(session, http_request, user_id)
+            if not take_question(session, scope):
+                raise limit_reached(scope)
+            return scope
 
-    memory, analysis = await asyncio.to_thread(load_context)
+    def return_quota(scope: QuotaScope) -> None:
+        with session_scope() as session:
+            give_back_question(session, scope)
+
+    def load_context() -> tuple[bool, str, CoachAnalysis | None]:
+        with session_scope() as session:
+            allowed = can_access(session, request.platform, request.username, user_id)
+            memory = ""
+            if allowed:
+                player = get_or_create_player(session, request.platform, request.username)
+                memory = _player_memory_context(session, player.id)
+            if request.game_id is None:
+                return allowed, memory, None
+            analyses = load_analyses(session, request.platform, request.username, request.game_id).analyses
+            return allowed, memory, analyses[0] if analyses else None
+
+    scope = await asyncio.to_thread(take_quota)
+    allowed, memory, analysis = await asyncio.to_thread(load_context)
     started = time.perf_counter()
-    response = await ask_coach(
-        request.question,
-        analysis,
-        fen=request.fen,
-        platform=request.platform,
-        username=request.username,
-        memory_context=memory,
-        message_history=request.message_history,
-    )
+    try:
+        # Without access the coach still sees the public game, but gets no player identity,
+        # so its tools cannot reach this player's practice data.
+        response = await ask_coach(
+            request.question,
+            analysis,
+            fen=request.fen,
+            platform=request.platform if allowed else None,
+            username=request.username if allowed else None,
+            memory_context=memory,
+            message_history=request.message_history,
+        )
+    except Exception:
+        await asyncio.to_thread(return_quota, scope)
+        raise
     log_event(
         "coach_answered",
         {

@@ -44,6 +44,8 @@ export interface TodaySummary {
     next_due_at: string | null;
   };
   latest_game: TodayLatestGame | null;
+  /** Due reviews were left out: another account owns this player. */
+  private?: boolean;
 }
 
 export function todayKey(platform: Platform, player: string) {

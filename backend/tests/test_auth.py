@@ -96,7 +96,7 @@ def test_callback_success_sets_session_and_revokes_token(monkeypatch):
         assert response.status_code == 302
         assert response.headers["location"] == "/progress?tab=1"
         session = unsign(client.cookies.get(SESSION_COOKIE), "session", 3600)
-        assert session["lichess_username"] == "DrNykterstein"
+        assert session["uid"]
         assert "access_token" not in session and "lio_test" not in client.cookies.get(SESSION_COOKIE)
 
         token_request = calls[0]
@@ -113,10 +113,16 @@ def test_callback_success_sets_session_and_revokes_token(monkeypatch):
         ]
 
         me = client.get("/api/auth/me").json()
-        assert me == {"signed_in": True, "lichess_username": "DrNykterstein"}
+        assert me["signed_in"] is True
+        assert me["lichess_username"] == "DrNykterstein"
+        assert me["plan"] == "free"
+        assert me["players"] == [{"platform": "lichess", "username": "DrNykterstein"}]
 
         assert client.post("/api/auth/logout").status_code == 204
-        assert client.get("/api/auth/me").json() == {"signed_in": False, "lichess_username": None}
+        me = client.get("/api/auth/me").json()
+        assert me["signed_in"] is False
+        assert me["lichess_username"] is None
+        assert me["players"] == []
 
 
 def test_state_mismatch_rejected(monkeypatch):
@@ -167,13 +173,13 @@ def test_open_redirect_blocked(target):
 
 
 def test_tampered_session_ignored():
-    token = sign({"lichess_username": "someone"}, "session")
+    token = sign({"uid": "someone"}, "session")
     body, _, _ = token.rpartition(".")
     with TestClient(app) as client:
         client.cookies.set(SESSION_COOKIE, body + ".bad")
         assert client.get("/api/auth/me").json()["signed_in"] is False
         # A valid OAuth-purpose token must not work as a session.
-        client.cookies.set(SESSION_COOKIE, sign({"lichess_username": "x"}, "oauth"))
+        client.cookies.set(SESSION_COOKIE, sign({"uid": "x"}, "oauth"))
         assert client.get("/api/auth/me").json()["signed_in"] is False
 
 

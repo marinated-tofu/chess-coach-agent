@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { SETTINGS_KEY, getSettings, saveSettings, useAuth } from './authApi';
 
 // Web Speech API wrapper: text-to-speech for coach answers and speech-to-text for
 // questions. Every call is a no-op where the browser lacks support.
@@ -78,6 +80,18 @@ export function useSpeech() {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<Recognition | null>(null);
 
+  // Signed-in users keep this preference on their account; everyone else keeps it in the browser.
+  const queryClient = useQueryClient();
+  const signedIn = useAuth().data?.signed_in ?? false;
+  const accountSettings = useQuery({ queryKey: SETTINGS_KEY, queryFn: getSettings, enabled: signedIn, staleTime: 5 * 60_000, retry: false });
+  const accountSpeak = accountSettings.data?.speak_answers;
+
+  useEffect(() => {
+    if (accountSpeak === undefined) return;
+    setSpeakEnabledState(ttsSupported && accountSpeak);
+    storePreference(accountSpeak);
+  }, [accountSpeak, ttsSupported]);
+
   const stopSpeaking = useCallback(() => {
     if (ttsSupported) window.speechSynthesis.cancel();
   }, [ttsSupported]);
@@ -100,8 +114,14 @@ export function useSpeech() {
       setSpeakEnabledState(enabled);
       storePreference(enabled);
       if (!enabled) stopSpeaking();
+      if (signedIn) {
+        queryClient.setQueryData(SETTINGS_KEY, { speak_answers: enabled });
+        saveSettings({ speak_answers: enabled }).catch(() => {
+          // The toggle still works for this visit; the next load shows the saved value.
+        });
+      }
     },
-    [stopSpeaking]
+    [queryClient, signedIn, stopSpeaking]
   );
 
   const stopListening = useCallback(() => {

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .accounts import Viewer, require_access
 from .db import session_scope
 from .db_models import PlayerRow
 from .endgames import (
@@ -127,9 +128,12 @@ def _drill_out(drill: Drill, progress: DrillProgress | None, now: datetime) -> D
 
 
 @router.get("", response_model=DrillsResponse)
-def list_drills(platform: str | None = None, username: str | None = None) -> DrillsResponse:
+def list_drills(
+    user_id: Viewer, platform: str | None = None, username: str | None = None
+) -> DrillsResponse:
     """Essentials for everyone; a known player also gets own-game drills and saved progress."""
     with session_scope() as session:
+        _require_viewer(session, platform, username, user_id)
         player = _find_player(session, platform, username)
         games = own_game_drills(session, player) if player else []
         progress = drill_progress(session, player) if player else {}
@@ -137,6 +141,13 @@ def list_drills(platform: str | None = None, username: str | None = None) -> Dri
         return DrillsResponse(
             drills=[_drill_out(drill, progress.get(drill.fen), now) for drill in [*games, *load_essentials()]]
         )
+
+
+def _require_viewer(
+    session: Session, platform: str | None, username: str | None, user_id: str | None
+) -> None:
+    if platform and (username or "").strip():
+        require_access(session, platform, username, user_id)
 
 
 def _resolve(drill_id: str, platform: str | None, username: str | None) -> Drill:
@@ -189,8 +200,10 @@ def _record(drill: Drill, turn: Turn, request: TurnRequest) -> TurnOut:
 
 
 @router.post("/turn", response_model=TurnOut)
-async def take_turn(request: TurnRequest) -> TurnOut:
+async def take_turn(request: TurnRequest, user_id: Viewer) -> TurnOut:
     """Judge the player's latest move, reply with Stockfish, and record a finished drill."""
+    with session_scope() as session:
+        _require_viewer(session, request.platform, request.username, user_id)
     drill = await asyncio.to_thread(_resolve, request.drill_id, request.platform, request.username)
     if request.resign:
         turn = Turn("failed", "You stopped the drill.", "resigned", drill.fen)

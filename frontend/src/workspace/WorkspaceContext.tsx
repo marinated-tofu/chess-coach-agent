@@ -113,6 +113,16 @@ type WorkspaceContextValue = {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
+/** Drops the remembered player, so a shared computer does not reopen it after sign-out. */
+export function forgetStoredWorkspace() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PLAYER_STORAGE_KEY);
+  } catch {
+    // Storage can be blocked; there is nothing to forget then.
+  }
+}
+
 function loadStoredWorkspace(): StoredWorkspace | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);

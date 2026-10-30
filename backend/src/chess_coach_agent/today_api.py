@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .accounts import Viewer, can_access
 from .db import session_scope
 from .db_models import (
     LIBRARY_PLAN_STATUS,
@@ -82,6 +83,8 @@ class TodaySummary(BaseModel):
     current_rating: dict[str, int] = Field(default_factory=dict)
     last_synced_at: datetime | None = None
     due: DueSummary = Field(default_factory=DueSummary)
+    # True when due reviews were left out because the viewer does not own this player.
+    private: bool = False
     latest_game: LatestGame | None = None
 
 
@@ -220,6 +223,9 @@ def today_summary(session: Session, platform: str, username: str) -> TodaySummar
 
 
 @router.get("/today/{platform}/{username}", response_model=TodaySummary)
-def get_today(platform: str, username: str) -> TodaySummary:
+def get_today(platform: str, username: str, user_id: Viewer) -> TodaySummary:
     with session_scope() as session:
-        return today_summary(session, platform, username)
+        summary = today_summary(session, platform, username)
+        if can_access(session, platform, username, user_id):
+            return summary
+        return summary.model_copy(update={"due": DueSummary(), "private": True})

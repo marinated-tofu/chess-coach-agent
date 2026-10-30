@@ -122,6 +122,12 @@
   background: var(--red-500);
 }
 
+.coach-quota {
+  margin: 8px 0 0;
+  color: var(--gray-500);
+  font-size: 13px;
+}
+
 .coach-listening {
   margin: 8px 0 0;
   color: var(--red-500);

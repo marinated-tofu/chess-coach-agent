@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowUp,
   Check,
@@ -13,6 +14,7 @@ import {
   VolumeX
 } from 'lucide-react';
 import { askCoach } from '../lib/api';
+import { AUTH_KEY, useAuth } from '../lib/authApi';
 import {
   sendCoachFeedback,
   type BoardArrow,
@@ -26,6 +28,8 @@ import { useWorkspace } from '../workspace/WorkspaceContext';
 import './CoachPanel.css';
 
 type FeedbackState = 'idle' | 'sending' | 'sent' | 'error';
+// The count only shows when it is about to matter.
+const LOW_QUOTA = 3;
 
 type CoachMessage = {
   role: 'coach';
@@ -114,6 +118,8 @@ export function CoachPanel({
 }) {
   const workspace = useWorkspace();
   const speech = useSpeech();
+  const queryClient = useQueryClient();
+  const quota = useAuth().data?.coach_quota;
   const [messages, setMessages] = useState<Message[]>([]);
   const [history, setHistory] = useState<unknown[]>([]);
   const [question, setQuestion] = useState('');
@@ -178,6 +184,7 @@ export function CoachPanel({
       setError(caught instanceof Error ? caught.message : 'The coach could not answer. Try again.');
     } finally {
       setPending(false);
+      void queryClient.invalidateQueries({ queryKey: AUTH_KEY });
       requestAnimationFrame(() => threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight }));
     }
   }
@@ -375,6 +382,13 @@ export function CoachPanel({
       </form>
       {speech.listening && <p className="coach-listening" role="status">Listening. Speak your question.</p>}
       {error && <p className="coach-error" role="alert">{error}</p>}
+      {quota && quota.remaining <= LOW_QUOTA && !error && (
+        <p className="coach-quota num">
+          {quota.remaining === 0
+            ? 'No coach questions left today.'
+            : `${quota.remaining} coach ${quota.remaining === 1 ? 'question' : 'questions'} left today.`}
+        </p>
+      )}
     </section>
   );
 }

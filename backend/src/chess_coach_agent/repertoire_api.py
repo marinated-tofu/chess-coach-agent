@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .accounts import Viewer, require_access, require_player
 from .db import session_scope
 from .db_models import PlayerRow, RepertoireRow
 from .repertoire import (
@@ -47,7 +48,8 @@ class DrillAnswer(BaseModel):
     move: str
 
 
-def _player(session: Session, platform: str, username: str) -> PlayerRow:
+def _player(session: Session, platform: str, username: str, user_id: str | None) -> PlayerRow:
+    require_access(session, platform, username, user_id)
     player = session.scalar(
         select(PlayerRow).where(
             PlayerRow.platform == platform,
@@ -59,10 +61,11 @@ def _player(session: Session, platform: str, username: str) -> PlayerRow:
     return player
 
 
-def _rep(session: Session, rep_id: str) -> RepertoireRow:
+def _rep(session: Session, rep_id: str, user_id: str | None) -> RepertoireRow:
     rep = session.get(RepertoireRow, rep_id)
     if rep is None:
         raise HTTPException(404, "Repertoire not found")
+    require_player(session, rep.player_id, user_id)
     return rep
 
 
@@ -81,9 +84,9 @@ def _full(session: Session, rep: RepertoireRow) -> dict[str, Any]:
 
 
 @router.get("")
-def list_repertoires(platform: str, username: str) -> list[dict[str, Any]]:
+def list_repertoires(platform: str, username: str, user_id: Viewer) -> list[dict[str, Any]]:
     with session_scope() as session:
-        player = _player(session, platform, username)
+        player = _player(session, platform, username, user_id)
         reps = session.scalars(
             select(RepertoireRow)
             .where(RepertoireRow.player_id == player.id)
@@ -93,9 +96,9 @@ def list_repertoires(platform: str, username: str) -> list[dict[str, Any]]:
 
 
 @router.post("")
-def create_repertoire(body: CreateRepertoire) -> dict[str, Any]:
+def create_repertoire(body: CreateRepertoire, user_id: Viewer) -> dict[str, Any]:
     with session_scope() as session:
-        player = _player(session, body.platform, body.username)
+        player = _player(session, body.platform, body.username, user_id)
         name = body.name.strip() or f"{body.color.capitalize()} repertoire"
         rep = RepertoireRow(player_id=player.id, color=body.color, name=name[:100])
         session.add(rep)
@@ -104,22 +107,22 @@ def create_repertoire(body: CreateRepertoire) -> dict[str, Any]:
 
 
 @router.get("/{rep_id}")
-def get_repertoire(rep_id: str) -> dict[str, Any]:
+def get_repertoire(rep_id: str, user_id: Viewer) -> dict[str, Any]:
     with session_scope() as session:
-        return _full(session, _rep(session, rep_id))
+        return _full(session, _rep(session, rep_id, user_id))
 
 
 @router.delete("/{rep_id}")
-def delete_repertoire(rep_id: str) -> dict[str, str]:
+def delete_repertoire(rep_id: str, user_id: Viewer) -> dict[str, str]:
     with session_scope() as session:
-        session.delete(_rep(session, rep_id))
+        session.delete(_rep(session, rep_id, user_id))
     return {"status": "deleted"}
 
 
 @router.post("/{rep_id}/moves")
-def post_move(rep_id: str, body: AddMove) -> dict[str, Any]:
+def post_move(rep_id: str, body: AddMove, user_id: Viewer) -> dict[str, Any]:
     with session_scope() as session:
-        rep = _rep(session, rep_id)
+        rep = _rep(session, rep_id, user_id)
         try:
             row, created = add_move(session, rep, body.parent_fen, body.move, comment=body.comment)
         except RepertoireError as exc:
@@ -128,9 +131,9 @@ def post_move(rep_id: str, body: AddMove) -> dict[str, Any]:
 
 
 @router.delete("/{rep_id}/moves/{move_id}")
-def delete_move(rep_id: str, move_id: str) -> dict[str, Any]:
+def delete_move(rep_id: str, move_id: str, user_id: Viewer) -> dict[str, Any]:
     with session_scope() as session:
-        rep = _rep(session, rep_id)
+        rep = _rep(session, rep_id, user_id)
         try:
             removed = remove_move(session, rep, move_id)
         except RepertoireError as exc:
@@ -139,9 +142,9 @@ def delete_move(rep_id: str, move_id: str) -> dict[str, Any]:
 
 
 @router.post("/{rep_id}/seed")
-def seed(rep_id: str) -> dict[str, Any]:
+def seed(rep_id: str, user_id: Viewer) -> dict[str, Any]:
     with session_scope() as session:
-        rep = _rep(session, rep_id)
+        rep = _rep(session, rep_id, user_id)
         report = seed_from_games(session, rep)
         return {
             "games_used": report.games_used,
@@ -154,11 +157,12 @@ def seed(rep_id: str) -> dict[str, Any]:
 @router.get("/{rep_id}/drill")
 def drill(
     rep_id: str,
+    user_id: Viewer,
     limit: int = Query(default=10, ge=1, le=50),
     include_all: bool = Query(default=False, description="Practice moves that are not due yet"),
 ) -> dict[str, Any]:
     with session_scope() as session:
-        rep = _rep(session, rep_id)
+        rep = _rep(session, rep_id, user_id)
         return {
             "due_count": count_due(session, rep),
             "items": drill_items(session, rep, limit=limit, include_all=include_all),
@@ -166,9 +170,9 @@ def drill(
 
 
 @router.post("/{rep_id}/drill/answer")
-def drill_answer(rep_id: str, body: DrillAnswer) -> dict[str, Any]:
+def drill_answer(rep_id: str, body: DrillAnswer, user_id: Viewer) -> dict[str, Any]:
     with session_scope() as session:
-        rep = _rep(session, rep_id)
+        rep = _rep(session, rep_id, user_id)
         try:
             result = answer(session, rep, body.move_id, body.move)
         except RepertoireError as exc:

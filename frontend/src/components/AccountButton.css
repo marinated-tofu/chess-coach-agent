@@ -38,6 +38,8 @@
 
 .account-name {
   min-width: 0;
+  color: inherit;
+  text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -87,6 +89,9 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .account-name:hover {
+    text-decoration: underline;
+  }
   .account-signin:hover,
   .account-use:hover,
   .account-icon-button:hover {

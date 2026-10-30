@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
 
@@ -30,6 +42,32 @@ class Vector384(TypeDecorator):
         return dialect.type_descriptor(JSON())
 
 
+class UserRow(Base):
+    __tablename__ = "users"
+    __table_args__ = (CheckConstraint("plan IN ('free', 'paid')", name="ck_users_plan"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    display_name: Mapped[str] = mapped_column(String(100))
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    plan: Mapped[str] = mapped_column(String(20), default="free", server_default="free")
+    settings: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class AuthIdentityRow(Base):
+    """One way to sign in. Adding a provider means adding rows, not columns on users."""
+
+    __tablename__ = "auth_identities"
+    __table_args__ = (UniqueConstraint("provider", "subject"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    subject: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class PlayerRow(Base):
     __tablename__ = "players"
     __table_args__ = (UniqueConstraint("platform", "username_normalized"),)
@@ -41,6 +79,28 @@ class PlayerRow(Base):
     current_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class UserPlayerRow(Base):
+    """A verified claim on a player. A player has at most one owner."""
+
+    __tablename__ = "user_players"
+
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # How ownership was proven: "lichess_oauth" or "chesscom_profile".
+    verified_by: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CoachUsageRow(Base):
+    """Coach questions asked per UTC day. Subject is "user:<id>" or "anon:<hash of address>"."""
+
+    __tablename__ = "coach_usage"
+
+    subject: Mapped[str] = mapped_column(String(64), primary_key=True)
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    questions: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class GameRow(Base):

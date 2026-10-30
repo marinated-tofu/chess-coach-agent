@@ -7,9 +7,15 @@ from pydantic_ai import RunContext
 from sqlalchemy import select
 
 from .db import session_scope
-from .db_models import CriticalMomentRow, GameRow, PlayerRow, TrainingPositionRow
+from .db_models import (
+    CriticalMomentRow,
+    GameRow,
+    PlayerRow,
+    TrainingPlanRow,
+    TrainingPositionRow,
+)
 from .engine import EngineAnalyzer
-from .repositories import player_profile
+from .repositories import normalize_username, player_profile
 from .quiz_copy import (
     candidate_payload,
     fetch_practice_candidates,
@@ -18,6 +24,20 @@ from .quiz_copy import (
 )
 from .training import build_training_session as create_training_plan
 from .training import evaluate_attempt, quiz_panel
+
+
+def _plan_is_attached(session: Any, ctx: RunContext[Any], plan_id: str | None) -> bool:
+    """Plan ids reach these tools from the model, so check they are the attached player's."""
+    if not plan_id or not ctx.deps.platform or not ctx.deps.username:
+        return False
+    plan = session.get(TrainingPlanRow, plan_id)
+    player = session.get(PlayerRow, plan.player_id) if plan else None
+    return (
+        player is not None
+        and player.platform == ctx.deps.platform
+        and player.username_normalized == normalize_username(ctx.deps.username)
+    )
+
 
 def inspect_game(ctx: RunContext[Any], game_id: str) -> dict[str, Any]:
     """Inspect one persisted game and its critical moments by external game ID."""
@@ -104,6 +124,8 @@ def write_quiz_copy(ctx: RunContext[Any], plan_id: str = "") -> dict[str, Any]:
     if not selected_plan:
         return {"error": "No training plan is attached"}
     with session_scope() as session:
+        if not _plan_is_attached(session, ctx, selected_plan):
+            return {"error": "Training plan not found for this player"}
         positions = session.scalars(
             select(TrainingPositionRow)
             .where(TrainingPositionRow.plan_id == selected_plan)
@@ -186,6 +208,9 @@ def evaluate_candidate_move(
     """Grade a move in a saved training position with legality and Stockfish evidence."""
     ctx.deps.record("evaluate_candidate_move")
     with session_scope() as session:
+        position = session.get(TrainingPositionRow, position_id)
+        if not _plan_is_attached(session, ctx, position.plan_id if position else None):
+            return {"error": "Training position not found for this player"}
         panel = evaluate_attempt(session, position_id, move)
         ctx.deps.panel = panel
         return panel.model_dump(mode="json")
