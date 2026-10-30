@@ -327,7 +327,8 @@ class TrainingSessionCreate(BaseModel):
     position_count: int = Field(default=5, ge=1, le=10)
     # "mixed": own-game positions first, topped up with library puzzles when short.
     # "puzzles": only library puzzles for the theme (or the player's top weakness).
-    mode: Literal["mixed", "puzzles"] = "mixed"
+    # "due": positions whose spaced-repetition review is due; "mixed" when none are.
+    mode: Literal["mixed", "puzzles", "due"] = "mixed"
 
 
 class TrainingPositionView(BaseModel):

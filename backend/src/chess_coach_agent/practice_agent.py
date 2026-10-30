@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .db_models import TrainingPlanRow
 from .llm import CoachDependencies, _openrouter_model, create_coach_agent
 from .quiz_copy import apply_llm_quiz_copy, fetch_practice_candidates, rank_moments_with_llm
-from .training import apply_default_quiz_copy, build_training_session
+from .training import apply_default_quiz_copy, build_due_session, build_training_session
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,18 @@ async def run_practice_agent(
             tools_used=[],
             duration_ms=int((time.perf_counter() - started) * 1000),
         )
+
+    if mode == "due":
+        plan = build_due_session(session, platform, username, position_count)
+        if plan is not None:
+            return PracticeAgentResult(
+                plan=plan,
+                used_llm=False,
+                fallback=True,
+                tools_used=[],
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
+        mode = "mixed"
 
     # Puzzle-only sessions have nothing from the player's games to rank.
     if mode != "puzzles" and os.getenv("OPENROUTER_API_KEY") and _openrouter_model() is not None:

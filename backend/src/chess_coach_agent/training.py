@@ -56,6 +56,8 @@ def _move_choices(fen: str, correct_move: str, difficulty: str) -> list[str]:
     return choices
 
 
+# TrainingPlanRow.status of a session of due reviews, so the study plan can tell them apart.
+REVIEW_PLAN_STATUS = "review"
 PUZZLE_RATING_OFFSET = {"beginner": -150, "intermediate": 0, "advanced": 150}
 
 
@@ -214,6 +216,66 @@ def build_training_session(
         position.hint = hint
         session.add(position)
     _add_puzzle_positions(session, plan, puzzles, difficulty, start=len(moments) + 1)
+    session.flush()
+    return plan
+
+
+def build_due_session(
+    session: Session, platform: str, username: str, position_count: int = 5
+) -> TrainingPlanRow | None:
+    """A session of the positions whose review is due, oldest first. None if nothing is due.
+
+    Each position is copied into the new session and its review schedule moves with it, so
+    answering updates that schedule. Ordinary sessions build new rows and leave it due forever.
+    """
+    player = get_or_create_player(session, platform, username)
+    due = session.execute(
+        select(ReviewScheduleRow, TrainingPositionRow)
+        .join(TrainingPositionRow, TrainingPositionRow.id == ReviewScheduleRow.position_id)
+        .where(
+            ReviewScheduleRow.player_id == player.id,
+            ReviewScheduleRow.due_at <= datetime.now(UTC),
+        )
+        .order_by(ReviewScheduleRow.due_at)
+    ).all()
+    picked: dict[str, tuple[ReviewScheduleRow, TrainingPositionRow]] = {}
+    for schedule, position in due:
+        # Repeat sessions store the same moment twice; show each board once per session.
+        picked.setdefault(position.fen, (schedule, position))
+        if len(picked) == position_count:
+            break
+    if not picked:
+        return None
+    positions = [position for _schedule, position in picked.values()]
+    plan = TrainingPlanRow(
+        player_id=player.id,
+        status=REVIEW_PLAN_STATUS,
+        focus_themes=list(dict.fromkeys(item.theme for item in positions)),
+        difficulty=positions[0].difficulty,
+    )
+    session.add(plan)
+    session.flush()
+    for order, (schedule, old) in enumerate(picked.values(), start=1):
+        copy = TrainingPositionRow(
+            plan_id=plan.id,
+            moment_id=old.moment_id,
+            position_order=order,
+            fen=old.fen,
+            correct_move=old.correct_move,
+            choices=old.choices,
+            theme=old.theme,
+            difficulty=old.difficulty,
+            explanation=old.explanation,
+            source=old.source,
+            puzzle_id=old.puzzle_id,
+            rating=old.rating,
+            solution=old.solution,
+            prompt=old.prompt,
+            hint=old.hint,
+        )
+        session.add(copy)
+        session.flush()
+        schedule.position_id = copy.id
     session.flush()
     return plan
 

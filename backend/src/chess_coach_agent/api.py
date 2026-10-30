@@ -29,6 +29,7 @@ from .auth_api import router as auth_router
 from .export_api import router as export_router
 from .explorer_api import router as explorer_router
 from .repertoire_api import router as repertoire_router
+from .study_plan_api import router as study_plan_router
 from .today_api import router as today_router
 from .library_api import router as library_router
 from .db import init_db, session_scope
@@ -53,6 +54,7 @@ app.include_router(auth_router)
 app.include_router(export_router)
 app.include_router(explorer_router)
 app.include_router(repertoire_router)
+app.include_router(study_plan_router)
 app.include_router(today_router)
 app.include_router(library_router)
 

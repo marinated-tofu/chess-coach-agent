@@ -54,6 +54,7 @@ export function GamePanel({
   coachArrows = [],
   coachHighlights = [],
   retryRequest,
+  onRetryFinished,
   compactBoard = false,
   renderSide
 }: {
@@ -64,6 +65,8 @@ export function GamePanel({
   coachHighlights?: BoardHighlight[];
   /** Starts a retry of the move at `ply`; a new `nonce` asks again for the same ply. */
   retryRequest?: { ply: number; nonce: number } | null;
+  /** The player played a move in a retry and it was graded (not when they revealed the answer). */
+  onRetryFinished?: (ply: number) => void;
   /** Small screens: keep only the board pinned at the top (used while the coach tab is open). */
   compactBoard?: boolean;
   /** The right-hand column. Receives the moves panel (graph, move list, square control) to place in a tab. */
@@ -100,6 +103,11 @@ export function GamePanel({
     currentMove &&
       (currentMoment || (currentMove.is_player_move && currentMove.classification && RETRY_LABELS.has(currentMove.classification)))
   );
+
+  const retryGraded = retry?.status === 'correct' || retry?.status === 'fine' || retry?.status === 'wrong';
+  useEffect(() => {
+    if (retry && retryGraded) onRetryFinished?.(retry.ply);
+  }, [retry?.ply, retryGraded]);
 
   // Leaving the retried position (moment cards, graph, list) ends the retry.
   useEffect(() => {
