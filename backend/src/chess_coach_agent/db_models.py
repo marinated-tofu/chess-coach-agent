@@ -296,3 +296,38 @@ class RepertoireReviewRow(Base):
     ease: Mapped[float] = mapped_column(Float, default=2.5)
     streak: Mapped[int] = mapped_column(Integer, default=0)
     last_result: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
+
+class StudyPlanRow(Base):
+    """A 7-day plan. ``days`` holds tasks only; progress is recomputed from activity on read."""
+
+    __tablename__ = "study_plans"
+    __table_args__ = (UniqueConstraint("player_id", "start_date"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), index=True)
+    start_date: Mapped[str] = mapped_column(String(10))  # the player's local date, YYYY-MM-DD
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    days: Mapped[list[list[dict[str, Any]]]] = mapped_column(JSON, default=list)
+    facts: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class StudyActivityRow(Base):
+    """Things the player did that leave no other dated trace: drill answers and game retries."""
+
+    __tablename__ = "study_activity"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(30))
+    # repertoire_review: ref is the move id, context the repertoire id.
+    # game_retry: ref is the external game id, context the ply.
+    ref: Mapped[str] = mapped_column(String(64))
+    context: Mapped[str] = mapped_column(String(32), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )

@@ -103,13 +103,15 @@ export function RepertoirePage() {
       const search = location.search as Record<string, unknown>;
       return {
         fen: typeof search.fen === 'string' ? search.fen : undefined,
-        color: search.color === 'black' || search.color === 'white' ? (search.color as RepertoireColor) : undefined
+        color: search.color === 'black' || search.color === 'white' ? (search.color as RepertoireColor) : undefined,
+        // The study plan links here with ?drill=true to open the drill directly.
+        drill: search.drill === true || search.drill === 'true'
       };
     },
     structuralSharing: true
   });
   const [color, setColor] = useState<RepertoireColor>(linked.color ?? 'white');
-  const [mode, setMode] = useState<Mode>('edit');
+  const [mode, setMode] = useState<Mode>(linked.drill ? 'drill' : 'edit');
   const [seedNote, setSeedNote] = useState<SeedResult | null>(null);
 
   const listKey = ['repertoires', platform, player.trim().toLowerCase()];

@@ -22,6 +22,7 @@ from .repertoire import (
     seed_from_games,
 )
 from .repositories import normalize_username
+from .study_plan import REPERTOIRE_REVIEW, record_activity
 
 router = APIRouter(prefix="/api/repertoire", tags=["repertoire"])
 
@@ -172,4 +173,5 @@ def drill_answer(rep_id: str, body: DrillAnswer) -> dict[str, Any]:
             result = answer(session, rep, body.move_id, body.move)
         except RepertoireError as exc:
             raise HTTPException(404, str(exc)) from exc
+        record_activity(session, rep.player_id, REPERTOIRE_REVIEW, body.move_id, rep.id)
         return {**result, "due_count": count_due(session, rep)}

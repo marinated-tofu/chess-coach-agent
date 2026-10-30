@@ -350,7 +350,8 @@ class TrainingSessionCreate(BaseModel):
     # "mixed": own-game positions first, topped up with library puzzles when short.
     # "puzzles": only library puzzles for the theme (or the player's top weakness).
     # "time": timed positions from the player's own games, chosen from their clock data.
-    mode: Literal["mixed", "puzzles", "time"] = "mixed"
+    # "due": positions whose spaced-repetition review is due; "mixed" when none are.
+    mode: Literal["mixed", "puzzles", "time", "due"] = "mixed"
 
 
 class TrainingPositionView(BaseModel):

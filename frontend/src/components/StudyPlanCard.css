@@ -1,0 +1,201 @@
+/* Weekly study plan on the Today page. Colors come from tokens.css only. */
+
+.plan-card {
+  margin-bottom: 16px;
+}
+
+.plan-summary {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-rationale {
+  margin: 0;
+  color: var(--gray-700);
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.plan-meter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  color: var(--gray-600);
+  font-size: 13px;
+}
+
+.plan-meter-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--gray-100);
+}
+
+.plan-meter-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green-500);
+  transform-origin: left center;
+  transition: transform 300ms ease-out;
+}
+
+.plan-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.plan-day {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 6px 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--gray-600);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
+}
+
+.plan-day.today {
+  color: var(--gray-900);
+  font-weight: 600;
+}
+
+.plan-day[aria-pressed="true"] {
+  border-color: var(--gray-150);
+  background: var(--gray-50);
+}
+
+.plan-day-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gray-200);
+}
+
+.plan-day.today .plan-day-dot {
+  background: var(--marker);
+}
+
+.plan-day-dot.done,
+.plan-day.today .plan-day-dot.done {
+  background: var(--green-500);
+}
+
+.plan-tasks {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-task {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--gray-100);
+}
+
+.plan-task-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--gray-200);
+  border-radius: 50%;
+  color: var(--gray-0);
+}
+
+.plan-task.in_progress .plan-task-mark {
+  border-color: var(--green-500);
+}
+
+.plan-task.done .plan-task-mark {
+  border-color: var(--green-500);
+  background: var(--green-500);
+}
+
+.plan-task.overdue .plan-task-mark {
+  border-color: var(--amber-300);
+  background: var(--amber-50);
+  color: var(--amber-700);
+}
+
+.plan-task-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-task-title {
+  margin: 0;
+  color: var(--gray-900);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.plan-task.done .plan-task-title {
+  color: var(--gray-600);
+}
+
+.plan-task-detail {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 13px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.plan-task-side {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.plan-task-progress {
+  color: var(--gray-600);
+  font-size: 13px;
+  text-align: right;
+}
+
+.plan-task.done .plan-task-progress {
+  color: var(--green-600);
+  font-weight: 600;
+}
+
+.plan-task-late {
+  color: var(--amber-700);
+}
+
+@media (max-width: 720px) {
+  .plan-task {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .plan-task-side {
+    grid-column: 2;
+    justify-items: start;
+  }
+
+  .plan-task-progress {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-meter-track span,
+  .plan-day {
+    transition: none;
+  }
+}

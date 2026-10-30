@@ -14,6 +14,7 @@ import { createTrainingSession, getAnalyzedGames } from '../lib/api';
 import { useCoachMarks } from '../lib/coachMarks';
 import { pgnDownloadUrl } from '../lib/exportApi';
 import { boardFenAt } from '../lib/reviewApi';
+import { recordGameRetry } from '../lib/studyPlanApi';
 import type { CoachAnalysis, CriticalMoment } from '../lib/types';
 import { useWorkspace } from '../workspace/WorkspaceContext';
 
@@ -255,6 +256,7 @@ export function GameReviewPage({ gameId, momentId }: { gameId: string; momentId?
         coachArrows={coachMarks.arrows}
         coachHighlights={coachMarks.highlights}
         retryRequest={retryRequest}
+        onRetryFinished={(ply) => recordGameRetry(workspace.player, workspace.platform, analysis.game.game_id, ply)}
         compactBoard={tab === 'coach'}
         renderSide={(movesPanel) => (
           <div className="rv-side-inner" data-tab={tab}>

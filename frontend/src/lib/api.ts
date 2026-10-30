@@ -71,7 +71,8 @@ export async function createTrainingSession(
   username: string,
   platform: Platform,
   theme?: string,
-  momentId?: string
+  momentId?: string,
+  mode: 'mixed' | 'puzzles' | 'due' = 'mixed'
 ): Promise<TrainingSession> {
   const response = await fetch('/api/training/sessions', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -80,7 +81,8 @@ export async function createTrainingSession(
       platform,
       theme: theme || null,
       moment_id: momentId || null,
-      position_count: momentId ? 1 : 5
+      position_count: momentId ? 1 : 5,
+      mode
     })
   });
   if (!response.ok) throw new Error('Could not build training session');

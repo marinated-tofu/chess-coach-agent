@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { ConnectAccount } from '../components/ConnectAccount';
 import { PageHeader } from '../components/PageHeader';
+import { StudyPlanCard } from '../components/StudyPlanCard';
 import { DueCard, LatestGameCard, LeakCard, RepertoireCard, relativePast } from '../components/TodayCards';
 import { getToday, todayKey, type TimeCategory } from '../lib/todayApi';
 import { useWorkspace } from '../workspace/WorkspaceContext';
@@ -70,6 +71,7 @@ export function HomePage() {
           </button>
         )}
       />
+      <StudyPlanCard player={player} platform={platform} />
       <div className="today-grid">
         <DueCard summary={summary} primary={primary === 'due'} />
         <LatestGameCard summary={summary} primary={primary === 'latest'} />
