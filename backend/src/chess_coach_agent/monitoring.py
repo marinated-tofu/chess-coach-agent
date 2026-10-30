@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
+import sys
+import traceback
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +18,49 @@ LOG_PATH = Path(
         str(Path(__file__).resolve().parents[2] / "data" / "logs" / "events.jsonl"),
     )
 )
+
+
+class JsonFormatter(logging.Formatter):
+    """One JSON object per line. Cloud Logging reads `severity` and `message` from it, and Error
+    Reporting groups entries by `stack_trace`."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry: dict[str, Any] = {
+            "timestamp": datetime.fromtimestamp(record.created, UTC).isoformat(),
+            "severity": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            **getattr(record, "fields", {}),
+        }
+        if record.exc_info and record.exc_info[0] is not None:
+            entry["error_type"] = record.exc_info[0].__name__
+            entry["stack_trace"] = "".join(traceback.format_exception(*record.exc_info))
+        return json.dumps(entry, default=str)
+
+
+class _StdoutHandler(logging.StreamHandler):
+    """Follows sys.stdout, which test runners swap out, rather than holding on to one stream."""
+
+    def __init__(self) -> None:
+        logging.Handler.__init__(self)
+
+    @property
+    def stream(self):
+        return sys.stdout
+
+
+def configure_logging() -> None:
+    root = logging.getLogger()
+    if any(isinstance(handler, _StdoutHandler) for handler in root.handlers):
+        return
+    handler = _StdoutHandler()
+    handler.setFormatter(JsonFormatter())
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+    # Uvicorn's own errors would otherwise reach the log as many plain text lines.
+    server = logging.getLogger("uvicorn")
+    server.handlers.clear()
+    server.propagate = True
 
 
 def log_event(event_type: str, payload: dict[str, Any]) -> None:

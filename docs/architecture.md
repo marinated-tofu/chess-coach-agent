@@ -74,7 +74,10 @@ API key, or on error or timeout, it returns a deterministic engine-based answer 
 
 `POST /api/games/sync` creates or resumes one active sync job per player. The server fetches up to
 5,000 games, skips external game IDs with existing analyses, and persists progress for polling via
-`GET /api/games/sync/{job_id}`. This replaces manual per-game selection.
+`GET /api/games/sync/{job_id}`. This replaces manual per-game selection. Jobs live in a queue in the
+`sync_jobs` table (`sync_queue.py`), and a worker loop in the app process claims them with
+`FOR UPDATE SKIP LOCKED` and heartbeats. A job whose worker dies is picked up again after two
+minutes, up to five times, and skips the games it already stored.
 
 The React app uses TanStack Router for addressable workflows and TanStack Query for server state.
 Recharts renders progress trends. `WorkspaceContext` retains only import and transient selection
@@ -85,6 +88,7 @@ state plus the offline analysis cache.
 | Method | Path | Role |
 | --- | --- | --- |
 | `GET` | `/api/health` | Liveness check for Render and local dev |
+| `GET` | `/api/health/ready` | Checks the database and Stockfish; 503 if either fails |
 | `GET` | `/api/llm/status` | Whether OpenRouter + PydanticAI practice path is configured |
 | `GET` | `/api/sample` | Bundled sample PGN for empty workspaces |
 | `POST` | `/api/analyze` | Paste/import PGN and persist analyses |

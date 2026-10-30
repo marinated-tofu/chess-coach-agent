@@ -11,12 +11,13 @@ import os
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from .accounts import Viewer, require_access
+from .coach_limits import QuotaCharge
 from .db import session_scope
 from .db_models import GameRow, StudyPlanRow
 from .monitoring import log_event
@@ -64,9 +65,30 @@ def _build(platform: str, username: str, today: date) -> tuple[str, bool, dict[s
         return plan.id, plan.rationale is None, dict(plan.facts)
 
 
+async def _limited_rationale(
+    facts: dict[str, Any], request: Request, user_id: str | None
+) -> tuple[str | None, bool]:
+    """The note, if the viewer has quota for one, and whether the limit stopped it.
+
+    The plan is already stored: a slow or failed LLM call, or the limit, only loses the note.
+    A note the model wrote that failed verification stays counted. Those plans are asked again on
+    every POST, so a refund there would leave them unlimited.
+    """
+    charge = QuotaCharge(request, user_id, "study_plan")
+    if not await asyncio.to_thread(charge.take):
+        return None, True
+    answered = False
+    try:
+        rationale, answered = await write_rationale(facts)
+    finally:
+        if not answered:
+            await asyncio.to_thread(charge.refund)
+    return rationale, False
+
+
 @router.post("/{platform}/{username}", response_model=StudyPlanResponse)
 async def post_study_plan(
-    platform: str, username: str, body: CreateStudyPlan, user_id: Viewer
+    platform: str, username: str, body: CreateStudyPlan, request: Request, user_id: Viewer
 ) -> StudyPlanResponse:
     with session_scope() as session:
         require_access(session, platform, username, user_id)
@@ -78,9 +100,9 @@ async def post_study_plan(
     if built is not None:
         plan_id, needs_rationale, facts = built
         rationale = None
+        limited = False
         if needs_rationale and os.getenv("OPENROUTER_API_KEY"):
-            # The plan is already stored: a slow or failed LLM call only loses the note.
-            rationale = await write_rationale(facts)
+            rationale, limited = await _limited_rationale(facts, request, user_id)
         if rationale:
             with session_scope() as session:
                 row = session.get(StudyPlanRow, plan_id)
@@ -88,7 +110,12 @@ async def post_study_plan(
                     row.rationale = rationale
         log_event(
             "study_plan_ready",
-            {"plan_id": plan_id, "tasks": facts.get("tasks"), "rationale": bool(rationale)},
+            {
+                "plan_id": plan_id,
+                "tasks": facts.get("tasks"),
+                "rationale": bool(rationale),
+                "llm_limited": limited,
+            },
         )
     with session_scope() as session:
         player = _find_player(session, platform, username)

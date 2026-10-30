@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,8 +19,8 @@ from .models import (
     AnalyzeResponse,
     FeedbackRequest,
 )
-from .monitoring import log_event, monitoring_summary
-from .adaptive_api import router as adaptive_router
+from .monitoring import configure_logging, log_event, monitoring_summary
+from .adaptive_api import process_sync_job, router as adaptive_router
 from .openings_api import router as openings_router
 from .endgames_api import router as endgames_router
 from .engine_api import router as engine_router
@@ -37,13 +38,20 @@ from .library_api import router as library_router
 from .puzzles_api import router as puzzles_router
 from .accounts import Viewer, require_access
 from .db import init_db, session_scope
+from .health import readiness_checks
 from .repositories import persist_analyses
+from .sync_queue import start_worker, stop_worker
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    configure_logging()
     init_db()
+    start_worker(process_sync_job)
     yield
+    await stop_worker()
 
 
 app = FastAPI(title="Chess Coach Agent API", version="0.2.0", lifespan=lifespan)
@@ -79,9 +87,33 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
+    # Starlette re-raises after this, so the server and test clients still see the exception.
+    # The query string and body stay out of the log: they can hold personal data.
+    logger.error(
+        "Unhandled exception",
+        exc_info=exc,
+        extra={"fields": {"method": request.method, "path": request.url.path}},
+    )
+    return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/health/ready")
+async def ready() -> JSONResponse:
+    """Whether this instance can do its work. /api/health only says the process is up, which
+    stays true without Stockfish because analysis quietly falls back to a material count."""
+    checks = await readiness_checks()
+    healthy = all(result == "ok" for result in checks.values())
+    return JSONResponse(
+        {"status": "ready" if healthy else "unavailable", "checks": checks},
+        status_code=200 if healthy else 503,
+    )
 
 
 @app.get("/api/llm/status")

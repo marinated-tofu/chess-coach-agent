@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from chess_coach_agent import adaptive_api, importers
-from chess_coach_agent.adaptive_api import _process_sync_job, _sync_failure_message
+from chess_coach_agent.adaptive_api import process_sync_job, _sync_failure_message
 from chess_coach_agent.agent import sample_pgn
 from chess_coach_agent.api import app
 from chess_coach_agent.db import session_scope
@@ -229,7 +229,7 @@ def test_sync_backfills_start_times_on_games_it_skips(monkeypatch):
 
     monkeypatch.setattr(adaptive_api, "fetch_platform_pgn", fetch)
     request = SyncGamesRequest(platform="chess.com", username="kfctofu", max_games=1)
-    asyncio.run(_process_sync_job(job_id, request))
+    asyncio.run(process_sync_job(job_id, request))
     with session_scope() as session:
         job = session.get(SyncJobRow, job_id)
         assert job.status == "complete"

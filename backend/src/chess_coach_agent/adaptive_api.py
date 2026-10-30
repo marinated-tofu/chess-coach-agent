@@ -2,20 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import UTC, datetime, timedelta
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import select
 
 from .accounts import Viewer, can_access, public_profile, require_access, require_player
-from .coach_limits import (
-    QuotaScope,
-    give_back_question,
-    limit_reached,
-    quota_scope,
-    take_question,
-)
+from .coach_limits import QuotaCharge, limit_reached
 from .db import session_scope
 from .agent import ChessCoachAgent
 from .analysis import ANALYSIS_VERSION
@@ -52,15 +45,13 @@ from .repositories import (
     training_session_view,
 )
 from .practice_agent import run_practice_agent
+from .sync_queue import ACTIVE_STATUSES, notify_worker
 from .time_trainer import TimeTrainerUnavailable, build_time_session
 from .training import evaluate_attempt
 
 
 router = APIRouter(prefix="/api")
 coach_agent = ChessCoachAgent()
-ACTIVE_SYNC_STATUSES = ("queued", "fetching", "analyzing")
-# A job whose row has not moved in this long lost its worker (e.g. the server restarted).
-STALE_SYNC_AFTER = timedelta(minutes=10)
 
 
 def _sync_failure_message(exc: Exception) -> str:
@@ -108,13 +99,18 @@ def _sync_error_message(exc: Exception) -> str:
     return _sync_failure_message(exc) or exc.__class__.__name__
 
 
-async def _process_sync_job(job_id: str, request: SyncGamesRequest) -> None:
+async def process_sync_job(job_id: str, request: SyncGamesRequest) -> None:
+    """Run one claimed job. A retried job starts over: games it finished are found stored."""
     try:
         with session_scope() as session:
             job = session.get(SyncJobRow, job_id)
             if job is None:
                 return
             job.status = "fetching"
+            # Games a lost attempt analyzed come up as stored this time. They are already in
+            # analyzed_games, so they must not count as skipped as well.
+            already_counted = job.analyzed_games
+            job.skipped_games = 0
         pgn = await fetch_platform_pgn(request.platform, request.username, request.max_games)
         previews = preview_pgn_games(
             pgn, request.username, request.platform, request.max_games
@@ -154,7 +150,10 @@ async def _process_sync_job(job_id: str, request: SyncGamesRequest) -> None:
                     )
                     or []
                 ):
-                    job.skipped_games += 1
+                    if already_counted:
+                        already_counted -= 1
+                    else:
+                        job.skipped_games += 1
                     continue
 
             try:
@@ -205,39 +204,28 @@ async def _process_sync_job(job_id: str, request: SyncGamesRequest) -> None:
         log_event("games_sync_failed", {"job_id": job_id, "error": message})
 
 
-def _is_stale(job: SyncJobRow) -> bool:
-    updated = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=UTC)
-    return datetime.now(UTC) - updated > STALE_SYNC_AFTER
-
-
 @router.post("/games/sync", response_model=SyncJobView)
-async def sync_games(
-    request: SyncGamesRequest, background_tasks: BackgroundTasks
-) -> SyncJobView:
+async def sync_games(request: SyncGamesRequest) -> SyncJobView:
     with session_scope() as session:
         player = get_or_create_player(session, request.platform, request.username)
-        active_jobs = session.scalars(
+        active = session.scalar(
             select(SyncJobRow)
-            .where(
-                SyncJobRow.player_id == player.id,
-                SyncJobRow.status.in_(ACTIVE_SYNC_STATUSES),
-            )
+            .where(SyncJobRow.player_id == player.id, SyncJobRow.status.in_(ACTIVE_STATUSES))
             .order_by(SyncJobRow.created_at.desc())
-        ).all()
-        for active in active_jobs:
-            if not _is_stale(active):
-                return _sync_job_view(active)
-            active.status = "failed"
-            active.error = "Sync was interrupted before it finished. Start it again to resume."
+            .limit(1)
+        )
+        if active is not None:
+            return _sync_job_view(active)
         job = SyncJobRow(
             player_id=player.id,
             platform=request.platform,
             username=request.username,
+            max_games=request.max_games,
         )
         session.add(job)
         session.flush()
         view = _sync_job_view(job)
-    background_tasks.add_task(_process_sync_job, job.id, request)
+    notify_worker()
     return view
 
 
@@ -296,7 +284,7 @@ def _create_time_session(request: TrainingSessionCreate) -> TrainingSessionView:
 
 @router.post("/training/sessions", response_model=TrainingSessionView)
 async def create_training_session(
-    request: TrainingSessionCreate, user_id: Viewer
+    request: TrainingSessionCreate, http_request: Request, user_id: Viewer
 ) -> TrainingSessionView:
     with session_scope() as session:
         require_access(session, request.platform, request.username, user_id)
@@ -304,40 +292,50 @@ async def create_training_session(
         # Stockfish vets every position, so keep it off the event loop. No LLM copy here:
         # the prompt has to stay neutral, and the verdict comes from the engine.
         return await asyncio.to_thread(_create_time_session, request)
-    with session_scope() as session:
-        result = await run_practice_agent(
-            session,
-            request.platform,
-            request.username,
-            request.theme,
-            request.position_count,
-            request.moment_id,
-            request.mode,
-        )
-        view = training_session_view(session, result.plan.id)
-        if view is None:
-            raise HTTPException(500, "Training session could not be created")
-        log_event(
-            "training_session_created",
-            {
-                "training_session_id": result.plan.id,
-                "positions": len(view.positions),
-                "puzzles": sum(item.source == "puzzle" for item in view.positions),
-                "mode": request.mode,
-                "difficulty": result.plan.difficulty,
-            },
-        )
-        log_event(
-            "practice_agent_completed",
-            {
-                "training_session_id": result.plan.id,
-                "used_llm": result.used_llm,
-                "fallback": result.fallback,
-                "tools_used": result.tools_used,
-                "duration_ms": result.duration_ms,
-            },
-        )
-        return view
+    charge = QuotaCharge(http_request, user_id, "practice")
+    try:
+        with session_scope() as session:
+            result = await run_practice_agent(
+                session,
+                request.platform,
+                request.username,
+                request.theme,
+                request.position_count,
+                request.moment_id,
+                request.mode,
+                take_llm_quota=charge.take,
+            )
+            view = training_session_view(session, result.plan.id)
+            if view is None:
+                raise HTTPException(500, "Training session could not be created")
+            log_event(
+                "training_session_created",
+                {
+                    "training_session_id": result.plan.id,
+                    "positions": len(view.positions),
+                    "puzzles": sum(item.source == "puzzle" for item in view.positions),
+                    "mode": request.mode,
+                    "difficulty": result.plan.difficulty,
+                },
+            )
+            log_event(
+                "practice_agent_completed",
+                {
+                    "training_session_id": result.plan.id,
+                    "used_llm": result.used_llm,
+                    "fallback": result.fallback,
+                    "llm_limited": result.llm_limited,
+                    "tools_used": result.tools_used,
+                    "duration_ms": result.duration_ms,
+                },
+            )
+    except Exception:
+        await asyncio.to_thread(charge.refund)
+        raise
+    # After the session above has committed: with SQLite the refund would wait on its writes.
+    if not result.used_llm:
+        await asyncio.to_thread(charge.refund)
+    return view
 
 
 @router.get("/training/sessions/{training_session_id}", response_model=TrainingSessionView)
@@ -424,17 +422,6 @@ def _player_memory_context(session, player_id: str) -> str:
 async def ask_coach_route(
     request: CoachAskRequest, http_request: Request, user_id: Viewer
 ) -> CoachAskResponse:
-    def take_quota() -> QuotaScope:
-        with session_scope() as session:
-            scope = quota_scope(session, http_request, user_id)
-            if not take_question(session, scope):
-                raise limit_reached(scope)
-            return scope
-
-    def return_quota(scope: QuotaScope) -> None:
-        with session_scope() as session:
-            give_back_question(session, scope)
-
     def load_context() -> tuple[bool, str, CoachAnalysis | None]:
         with session_scope() as session:
             allowed = can_access(session, request.platform, request.username, user_id)
@@ -447,7 +434,9 @@ async def ask_coach_route(
             analyses = load_analyses(session, request.platform, request.username, request.game_id).analyses
             return allowed, memory, analyses[0] if analyses else None
 
-    scope = await asyncio.to_thread(take_quota)
+    charge = QuotaCharge(http_request, user_id, "coach")
+    if not await asyncio.to_thread(charge.take):
+        raise limit_reached(charge.scope)
     allowed, memory, analysis = await asyncio.to_thread(load_context)
     started = time.perf_counter()
     try:
@@ -463,7 +452,7 @@ async def ask_coach_route(
             message_history=request.message_history,
         )
     except Exception:
-        await asyncio.to_thread(return_quota, scope)
+        await asyncio.to_thread(charge.refund)
         raise
     log_event(
         "coach_answered",

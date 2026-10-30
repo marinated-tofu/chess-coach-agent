@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
@@ -30,6 +32,7 @@ class PracticeAgentResult:
     fallback: bool
     tools_used: list[str]
     duration_ms: int
+    llm_limited: bool = False
 
 
 async def run_practice_agent(
@@ -40,7 +43,11 @@ async def run_practice_agent(
     position_count: int = 5,
     moment_id: str | None = None,
     mode: str = "mixed",
+    take_llm_quota: Callable[[], bool] | None = None,
 ) -> PracticeAgentResult:
+    """Build a session. `take_llm_quota` is called once, only if the model would run; when it
+    returns False nothing here calls the model. The caller refunds it if `used_llm` is False.
+    """
     started = time.perf_counter()
     deps = CoachDependencies(
         platform=platform,
@@ -80,8 +87,15 @@ async def run_practice_agent(
             )
         mode = "mixed"
 
+    llm_allowed = bool(os.getenv("OPENROUTER_API_KEY"))
+    llm_limited = False
+    if llm_allowed and take_llm_quota is not None:
+        session.commit()  # the charge has its own session, which must not wait on this one
+        llm_allowed = await asyncio.to_thread(take_llm_quota)
+        llm_limited = not llm_allowed
+
     # Puzzle-only sessions have nothing from the player's games to rank.
-    if mode != "puzzles" and os.getenv("OPENROUTER_API_KEY") and _openrouter_model() is not None:
+    if mode != "puzzles" and llm_allowed and _openrouter_model() is not None:
         try:
             agent = create_coach_agent()
             await agent.run(PRACTICE_AGENT_PROMPT, deps=deps)
@@ -106,9 +120,12 @@ async def run_practice_agent(
             logger.exception("Practice agent failed; using deterministic fallback")
 
     candidates = fetch_practice_candidates(session, platform, username, theme, limit=20)
-    ranked, rank_used_llm = rank_moments_with_llm(
-        session, platform, username, candidates, position_count
-    )
+    if llm_allowed:
+        ranked, rank_used_llm = rank_moments_with_llm(
+            session, platform, username, candidates, position_count
+        )
+    else:
+        ranked, rank_used_llm = [item.id for item in candidates[:position_count]], False
     plan = build_training_session(
         session,
         platform,
@@ -119,7 +136,7 @@ async def run_practice_agent(
         ordered_moment_ids=ranked or None,
         mode=mode,
     )
-    if os.getenv("OPENROUTER_API_KEY"):
+    if llm_allowed:
         quiz_used_llm = apply_llm_quiz_copy(session, plan.id)
     else:
         apply_default_quiz_copy(session, plan.id)
@@ -130,4 +147,5 @@ async def run_practice_agent(
         fallback=True,
         tools_used=[],
         duration_ms=int((time.perf_counter() - started) * 1000),
+        llm_limited=llm_limited,
     )

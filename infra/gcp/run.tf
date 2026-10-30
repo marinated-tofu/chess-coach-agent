@@ -29,8 +29,8 @@ resource "google_cloud_run_v2_service" "app" {
           cpu    = "1"
           memory = "2Gi"
         }
-        # Game syncs run as background tasks after the request returns. With CPU
-        # throttled between requests they would stall, so keep CPU allocated.
+        # The game sync worker runs in the app process between requests. With CPU
+        # throttled there it would stall, so keep CPU allocated.
         cpu_idle          = false
         startup_cpu_boost = true
       }
@@ -57,6 +57,11 @@ resource "google_cloud_run_v2_service" "app" {
           LICHESS_CLIENT_ID       = "chess-coach-agent"
           PUBLIC_BASE_URL         = var.public_base_url
           MONITORING_LOG_PATH     = "/tmp/chess-coach-events.jsonl"
+          # client_address() takes the Nth entry from the end of X-Forwarded-For. Google's
+          # front end appends the caller's address as the last entry, and there is no load
+          # balancer here. Behind an external Application Load Balancer, which appends its
+          # own address too, this must become 2.
+          TRUSTED_PROXY_HOPS = "1"
         }
         content {
           name  = env.key
