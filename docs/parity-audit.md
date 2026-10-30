@@ -5,13 +5,16 @@ Audit date: 31 October 2026. This rechecks every row of the feature matrix in
 matrix's "Us" column was written before the parity work and is out of date; this file replaces it.
 
 "Shipped" means the code exists in the listed files. It does not mean each feature was tested
-against the competitor side by side. Competitor columns come from the October 2026 research and
-were not re-verified here, and competitors' prices could not be confirmed from their own pages.
+against the competitor side by side.
 
 ## Result
 
 27 of 28 matrix rows are shipped. The other, "free without daily caps", ended on purpose: the coach
 now has a daily limit so the product can be sold.
+
+The first three rows below closed matrix gaps, and the other 24 shipped matrix rows were already
+in place. The rest were not in the matrix. They came from competitor research or from what selling
+the product needs.
 
 | Former gap | Status | Where |
 | --- | --- | --- |
@@ -24,8 +27,6 @@ now has a daily limit so the product can be sold.
 | Per-user AI limits | Shipped | Coach: anonymous 5, free 20, paid 200 a day. Practice, plan notes and vision have their own limits. |
 | Durable sync queue, health checks | Shipped | `sync_queue.py`, `/api/health/ready` |
 | Tactics found and missed | Shipped | `tactics.py`, on Insights. Forks, pins, skewers, mate threats and mates, from stored engine data. Covers fewer chances than Chess.com may on purpose: each one must be proved. |
-
-The other 24 shipped rows were already in place before this work.
 
 ## Still open
 

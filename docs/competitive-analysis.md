@@ -17,7 +17,7 @@ public material. It does not prove the feature is absent.
 | Chessable | Course platform built on MoveTrainer, a spaced-repetition system where you play the move on the board. |
 | Chessly | GothamChess opening courses with video plus drill mode. Not verified in this research pass; cells come from product knowledge. |
 | Dr. Wolf | Chess.com's in-game coach app. Voiced, explains while you play, 3 free coached games. |
-| Chessigma | Free Stockfish 17 reviewer with a 9-tier move grade, eval graph, position editor. Ad-supported. "AI supercoach" announced but not shipped. |
+| Chessigma | Free Stockfish 17 reviewer with a 9-tier move grade, eval graph, position editor. Ad-supported. Its AI coach has shipped since this research (rechecked 31 October 2026). |
 | Chessvision.ai | Browser extension and site that turns a board in an image, book or video into a FEN and hands it to Lichess. |
 | Chessy (chessvia.ai) | LLM coach the user clipped. Voice in and out, 6 voices, personalities (Hustler, Roasty, GM Chessy), image upload, account sync, play against it, training plans. |
 | Chessiro Coach | LLM coach (page updated March 2026). Chat with arrows and highlighted squares, voice in 24 languages, Replay Mistakes puzzles, Smart Shuffle review, Maia bots from 250 to 3000. |
