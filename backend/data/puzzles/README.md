@@ -1,8 +1,9 @@
 # Themed puzzle subset
 
-`puzzles.jsonl` holds 1,250 tactics puzzles: 250 for each coaching theme, spread across
-rating bands from 600 to 2200 (about 32 per 200-point band). The practice session uses
-them only after the player's own game positions run out, or in the "puzzles" mode.
+`puzzles.jsonl` holds 5,000 tactics puzzles: 1,000 for each coaching theme, spread across
+rating bands from 600 to 2200 (125 per 200-point band). The practice session uses them only
+after the player's own game positions run out, or in the "puzzles" mode. The `/puzzles` page
+browses all of them.
 
 ## Source and license
 
@@ -13,17 +14,17 @@ them only after the player's own game positions run out, or in the "puzzles" mod
 
 ## How it was built
 
-The full dump is about 250 MB compressed, so it is streamed and never written to disk:
+The full dump is about 300 MB compressed, so it is streamed and never written to disk:
 
 ```sh
 cd backend
 curl -sL https://database.lichess.org/lichess_db_puzzle.csv.zst \
-  | zstd -dc | head -n 200000 \
-  | uv run python scripts/build_puzzle_subset.py
+  | zstd -dc | head -n 500000 \
+  | uv run python scripts/build_puzzle_subset.py --per-theme 1000
 ```
 
 Filters: popularity at least 80, at least 200 plays, rating deviation at most 90. The script
-stops reading once every theme has its 250 puzzles (about 62,000 rows in the October 2026 dump).
+stops reading once every theme has its puzzles (about 309,000 rows in the October 2026 dump).
 
 ## Format
 
@@ -34,7 +35,7 @@ One JSON object per line:
 | `id` | Lichess puzzle id |
 | `fen` | Position the player solves. This is the Lichess FEN **after** the opponent's first move has been played. |
 | `solution` | Remaining UCI moves, starting with the player's move. The Lichess opponent move is dropped. |
-| `solution_san` | `solution[0]` in SAN. Grading uses this move only, for now. |
+| `solution_san` | `solution[0]` in SAN. Practice grades this move only; the puzzle page grades the whole line. |
 | `rating` | Lichess puzzle rating |
 | `theme` | Our coaching theme (see the mapping below) |
 | `tags` | The original Lichess theme tags |

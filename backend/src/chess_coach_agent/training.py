@@ -5,10 +5,11 @@ from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 import chess
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .db_models import (
+    LIBRARY_PLAN_STATUS,
     CriticalMomentRow,
     GameRow,
     PlayerRow,
@@ -361,20 +362,9 @@ def evaluate_attempt(
             cp_loss = round(max(0, before_cp - after_cp) / 100, 2)
             correct = correct or cp_loss <= 0.5
 
-    attempt = QuizAttemptRow(
-        player_id=plan.player_id,
-        position_id=position.id,
-        submitted_move=submitted_move,
-        correct=correct,
-        legal=legal,
-        cp_loss=cp_loss,
-        hints_used=hints_used,
-        elapsed_ms=elapsed_ms,
+    schedule = _record_attempt(
+        session, position, plan.player_id, submitted_move, correct, legal, cp_loss, hints_used, elapsed_ms
     )
-    session.add(attempt)
-
-    schedule = schedule_review(session, plan.player_id, position.id, correct, hints_used)
-    recompute_player_memory(session, plan.player_id)
 
     explanation = (
         f"{submitted_move} is a strong engine-approved candidate. {position.explanation}"
@@ -393,4 +383,73 @@ def evaluate_attempt(
         cp_loss=cp_loss,
         explanation=explanation,
         next_review_at=schedule.due_at,
+    )
+
+
+def _record_attempt(
+    session: Session,
+    position: TrainingPositionRow,
+    player_id: str,
+    submitted_move: str,
+    correct: bool,
+    legal: bool,
+    cp_loss: float | None,
+    hints_used: int,
+    elapsed_ms: int,
+) -> ReviewScheduleRow:
+    """Store an attempt, move the position's review schedule and refresh player memory."""
+    session.add(
+        QuizAttemptRow(
+            player_id=player_id,
+            position_id=position.id,
+            submitted_move=submitted_move,
+            correct=correct,
+            legal=legal,
+            cp_loss=cp_loss,
+            hints_used=hints_used,
+            elapsed_ms=elapsed_ms,
+        )
+    )
+    schedule = schedule_review(session, player_id, position.id, correct, hints_used)
+    recompute_player_memory(session, player_id)
+    return schedule
+
+
+def record_puzzle_attempt(
+    session: Session,
+    player: PlayerRow,
+    puzzle: Puzzle,
+    submitted_move: str,
+    correct: bool,
+    elapsed_ms: int = 0,
+) -> ReviewScheduleRow:
+    """Count a puzzle solved on the puzzle page through the same tables as a practice attempt.
+
+    The line was already graded against the puzzle's solution, so no engine is involved.
+    """
+    plan = session.scalar(
+        select(TrainingPlanRow)
+        .where(TrainingPlanRow.player_id == player.id, TrainingPlanRow.status == LIBRARY_PLAN_STATUS)
+        .limit(1)
+    )
+    if plan is None:
+        plan = TrainingPlanRow(player_id=player.id, status=LIBRARY_PLAN_STATUS, focus_themes=[])
+        session.add(plan)
+        session.flush()
+    position_query = select(TrainingPositionRow).where(
+        TrainingPositionRow.plan_id == plan.id, TrainingPositionRow.puzzle_id == puzzle.id
+    )
+    position = session.scalar(position_query)
+    if position is None:
+        order = session.scalar(
+            select(func.count())
+            .select_from(TrainingPositionRow)
+            .where(TrainingPositionRow.plan_id == plan.id)
+        )
+        difficulty = difficulty_for(session, player, puzzle.theme)
+        _add_puzzle_positions(session, plan, [puzzle], difficulty, start=(order or 0) + 1)
+        session.flush()
+        position = session.scalar(position_query)
+    return _record_attempt(
+        session, position, player.id, submitted_move, correct, True, None, 0, elapsed_ms
     )

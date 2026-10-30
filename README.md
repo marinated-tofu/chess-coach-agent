@@ -72,6 +72,8 @@ Review and coaching:
 
 Training:
 
+- A puzzle page: 5,000 Lichess puzzles to browse by theme and rating and solve on the board.
+- Insights by time of day and weekday, with sample sizes and likely ranges shown.
 - Practice sessions built from the player's own mistakes, mixed with rated Lichess puzzles on the
   same themes, graded with Stockfish and scheduled with spaced repetition.
 - Opening repertoire builder with a spaced-repetition drill for each line.

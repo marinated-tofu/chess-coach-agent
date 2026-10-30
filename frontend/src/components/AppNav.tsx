@@ -11,6 +11,7 @@ import {
   Lightbulb,
   Menu,
   Microscope,
+  Puzzle,
   ScanLine,
   Swords,
   Target,
@@ -31,6 +32,7 @@ export type NavPath =
   | '/insights'
   | '/progress'
   | '/practice'
+  | '/puzzles'
   | '/repertoire'
   | '/endgames'
   | '/play'
@@ -68,6 +70,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Train',
     items: [
       { to: '/practice', label: 'Practice', icon: Target, hotkey: 'p', badge: 'due' },
+      { to: '/puzzles', label: 'Puzzles', icon: Puzzle, hotkey: 'z' },
       { to: '/repertoire', label: 'Repertoire', icon: BookMarked, hotkey: 'o' },
       { to: '/endgames', label: 'Endgames', icon: Crown, hotkey: 'n' }
     ]

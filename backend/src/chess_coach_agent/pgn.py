@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import chess
 import chess.pgn
@@ -48,6 +49,20 @@ def _int_header(headers: chess.pgn.Headers, key: str) -> int | None:
         return None
 
 
+def game_start_utc(headers: chess.pgn.Headers) -> datetime | None:
+    """UTC start time from UTCDate/UTCTime, which Chess.com and Lichess both export.
+
+    Pasted PGNs usually have only a local Date, which says nothing about the hour.
+    """
+    date, time = _header(headers, "UTCDate"), _header(headers, "UTCTime")
+    if not date or not time:
+        return None
+    try:
+        return datetime.strptime(f"{date} {time}", "%Y.%m.%d %H:%M:%S").replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
 def parse_pgn_text(pgn_text: str, player: str = "kfctofu", max_games: int = 20) -> list[ParsedGame]:
     handle = io.StringIO(pgn_text)
     parsed: list[ParsedGame] = []
@@ -87,6 +102,7 @@ def parse_pgn_text(pgn_text: str, player: str = "kfctofu", max_games: int = 20) 
             black=_header(headers, "Black") or "Black",
             result=headers.get("Result", "*"),
             date=headers.get("Date", "????.??.??"),
+            started_at=game_start_utc(headers),
             link=_header(headers, "Link") or _header(headers, "Site"),
             eco=headers.get("ECO", ""),
             time_control=headers.get("TimeControl", ""),

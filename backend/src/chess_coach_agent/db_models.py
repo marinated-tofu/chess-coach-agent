@@ -57,6 +57,8 @@ class GameRow(Base):
     player_color: Mapped[str] = mapped_column(String(12))
     player_elo: Mapped[int | None] = mapped_column(Integer, nullable=True)
     played_at: Mapped[str] = mapped_column(String(24), default="")
+    # UTC start time. Null for games imported before it was stored and PGNs without UTCTime.
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     time_control: Mapped[str] = mapped_column(String(40), default="")
     link: Mapped[str] = mapped_column(Text, default="")
     metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -143,6 +145,11 @@ class PlayerMemoryRow(Base):
     due_positions: Mapped[int] = mapped_column(Integer, default=0)
     preferences: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# Holds the positions behind puzzles solved on the puzzle page, one plan per player. It is not
+# a session: nothing serves its positions again, so they stay out of "due" counts.
+LIBRARY_PLAN_STATUS = "library"
 
 
 class TrainingPlanRow(Base):

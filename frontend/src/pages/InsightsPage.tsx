@@ -6,6 +6,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -17,7 +18,9 @@ import {
   getInsights,
   type InsightsResponse,
   type Leak,
-  type PhaseRow
+  type PhaseRow,
+  type ScheduleBreakdown,
+  type ScheduleRow
 } from '../lib/insightsApi';
 import { PageHeader } from '../components/PageHeader';
 import { useWorkspace } from '../workspace/WorkspaceContext';
@@ -42,6 +45,7 @@ const CHART = {
   reference: 'var(--gray-300)',
   cursor: 'rgb(var(--shadow-rgb) / 0.04)',
   bar: 'var(--green-500)',
+  barThin: 'var(--gray-200)',
   barStroke: 'var(--gray-0)'
 };
 
@@ -312,6 +316,100 @@ function ColorSection({ data }: { data: InsightsResponse }) {
   );
 }
 
+function ScheduleTooltip({ active, payload, minSample }: {
+  active?: boolean;
+  payload?: { payload: ScheduleRow }[];
+  minSample: number;
+}) {
+  const row = payload?.[0]?.payload;
+  if (!active || !row || !row.games) return null;
+  return (
+    <div className="insights-tooltip">
+      <strong>{row.label}</strong>
+      <span>Score {fmt(row.score_pct, 0, '%')}, likely {fmt(row.score_low_pct, 0)}-{fmt(row.score_high_pct, 0, '%')}</span>
+      <span>{row.games < minSample ? `Only ${row.games} of the ${minSample} games needed` : `${count(row.games)} games`}</span>
+    </div>
+  );
+}
+
+function ScheduleBlock({ title, name, plural, breakdown, minSample }: {
+  title: string;
+  name: string;
+  plural: string;
+  breakdown: ScheduleBreakdown;
+  minSample: number;
+}) {
+  const best = breakdown.rows.find((row) => row.key === breakdown.best);
+  const worst = breakdown.rows.find((row) => row.key === breakdown.worst);
+  const showAccuracy = breakdown.rows.some((row) => row.accuracy_games >= minSample);
+  return (
+    <div className="schedule-block">
+      <h3>{title}</h3>
+      <p className="schedule-verdict">
+        {best && worst
+          ? `${best.label.split(' ')[0]} beats ${worst.label.split(' ')[0]}: ${fmt(best.score_pct, 0, '%')} against ${fmt(worst.score_pct, 0, '%')}.`
+          : `No clear gap between ${plural} yet.`}
+      </p>
+      <div className="insights-chart" role="img" aria-label={`Score percentage by ${name}. Grey bars have fewer than ${minSample} games.`}>
+        <ResponsiveContainer width="100%" height={170}>
+          <BarChart data={breakdown.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke={CHART.grid} vertical={false} />
+            <XAxis dataKey="label" tickFormatter={(value: string) => value.split(' ')[0]} tick={{ fontSize: 11, fill: CHART.tick }} axisLine={false} tickLine={false} interval={0} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: CHART.tickMuted }} axisLine={false} tickLine={false} width={40} unit="%" />
+            <ReferenceLine y={50} stroke={CHART.reference} strokeDasharray="3 3" />
+            <Tooltip content={<ScheduleTooltip minSample={minSample} />} cursor={{ fill: CHART.cursor }} />
+            <Bar isAnimationActive={false} dataKey="score_pct" radius={[4, 4, 0, 0]} maxBarSize={44}>
+              {breakdown.rows.map((row) => <Cell key={row.key} fill={row.low_sample ? CHART.barThin : CHART.bar} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="schedule-table">
+      <table className="insights-table">
+        <thead>
+          <tr>
+            <th>{title.replace('By ', '').replace(/^./, (letter) => letter.toUpperCase())}</th>
+            <th>Games</th><th>Score</th><th>Likely range</th>
+            {showAccuracy && <th>Accuracy</th>}
+            <th>Blunders / game</th>
+          </tr>
+        </thead>
+        <tbody>
+          {breakdown.rows.map((row) => (
+            <tr key={row.key} className={row.low_sample ? 'schedule-thin' : undefined}>
+              <th scope="row">{row.label}</th>
+              <td>{count(row.games)}</td>
+              <td>{fmt(row.score_pct, 0, '%')}</td>
+              <td>{row.score_low_pct == null ? '–' : `${fmt(row.score_low_pct, 0)}-${fmt(row.score_high_pct, 0, '%')}`}</td>
+              {showAccuracy && <td>{row.accuracy_games >= minSample ? fmt(row.accuracy) : '–'}</td>}
+              <td>{row.games ? row.blunders_per_game.toFixed(2) : '–'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  );
+}
+
+function ScheduleSection({ data }: { data: InsightsResponse }) {
+  const { schedule, min_sample } = data;
+  return (
+    <section className="insights-section">
+      <SectionHead title="By time of day and weekday" n={schedule.sample_size} unit="games with a start time" />
+      <div className="schedule-grid">
+        <ScheduleBlock title="By time of day" name="time of day" plural="times of day" breakdown={schedule.by_time_of_day} minSample={min_sample} />
+        <ScheduleBlock title="By weekday" name="weekday" plural="weekdays" breakdown={schedule.by_day_of_week} minSample={min_sample} />
+      </div>
+      <p className="insights-footnote">
+        Times are in {schedule.timezone.replace(/_/g, ' ')}. Grey rows have fewer than {min_sample} games.
+        Likely range is the 95% interval on your score: if two ranges overlap, the gap may be chance.
+        {schedule.undated_games > 0 && ` ${count(schedule.undated_games)} of ${count(schedule.sample_size + schedule.undated_games)} games have no start time and are left out; a re-sync adds it.`}
+      </p>
+    </section>
+  );
+}
+
 function ConversionSection({ data }: { data: InsightsResponse }) {
   const c = data.conversion;
   return (
@@ -333,6 +431,14 @@ function ConversionSection({ data }: { data: InsightsResponse }) {
   );
 }
 
+function browserTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+}
+
 function SkeletonPage() {
   return (
     <div className="insights-skeleton" aria-busy="true" aria-label="Loading insights">
@@ -346,9 +452,10 @@ function SkeletonPage() {
 export function InsightsPage() {
   const workspace = useWorkspace();
   const [last, setLast] = useState(500);
+  const timezone = useState(browserTimezone)[0];
   const query = useQuery({
-    queryKey: ['insights', workspace.platform, workspace.player, last],
-    queryFn: () => getInsights(workspace.player, workspace.platform, last),
+    queryKey: ['insights', workspace.platform, workspace.player, last, timezone],
+    queryFn: () => getInsights(workspace.player, workspace.platform, last, timezone),
     enabled: workspace.player.trim().length > 0,
     staleTime: 60_000
   });
@@ -359,6 +466,7 @@ export function InsightsPage() {
     if (data.time.sample_size < min) missing.push('Time-pressure stats need clock times.');
     if (data.conversion.sample_size < min) missing.push('Winning and losing positions need move-by-move engine data.');
     if (data.opponents.sample_size < min) missing.push("Opponent-rating stats need opponent ratings, which aren't saved with games yet.");
+    if (data.schedule.sample_size < min) missing.push('Time-of-day stats need game start times, which older imports did not save.');
   }
 
   return (
@@ -417,6 +525,7 @@ export function InsightsPage() {
           </section>
           <PhaseSection data={data} />
           <TimeSection data={data} />
+          {data.schedule.sample_size >= min && <ScheduleSection data={data} />}
           {data.opponents.sample_size >= min && <OpponentSection data={data} />}
           <div className="insights-pair">
             <ColorSection data={data} />
@@ -425,8 +534,7 @@ export function InsightsPage() {
           {missing.length > 0 && (
             <section className="insights-missing">
               <p>
-                {missing.join(' ')} Older analyses are missing clocks and engine data; a full
-                re-sync adds them.
+                {missing.join(' ')} Older analyses are missing this data; a full re-sync adds it.
               </p>
               <Link className="secondary" to="/games" search={{ import: true }}>Re-sync games</Link>
             </section>

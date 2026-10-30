@@ -32,7 +32,10 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, tzinfo
+from math import sqrt
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -75,6 +78,17 @@ THEME_NOUNS = {
     "endgame_conversion": "endgame errors",
     "time_pressure": "moves in time trouble",
 }
+
+# (key, label, first hour) in the player's timezone. Blocks, not single hours: most players
+# have too few games in any one hour to say anything about it.
+DAY_PARTS: tuple[tuple[str, str, int], ...] = (
+    ("night", "Night (0-6)", 0),
+    ("morning", "Morning (6-12)", 6),
+    ("afternoon", "Afternoon (12-18)", 12),
+    ("evening", "Evening (18-24)", 18),
+)
+WEEKDAYS: tuple[str, ...] = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+WILSON_Z = 1.96  # 95% interval
 
 OPPONENT_BUCKETS: tuple[tuple[str, str], ...] = (
     ("much_lower", "200+ lower"),
@@ -143,6 +157,36 @@ class TimeSection(BaseModel):
     pressure: list[PressureRow]
     time_spent: TimeSpent
     lost_on_time: LostOnTime
+
+
+class ScheduleRow(BaseModel):
+    key: str
+    label: str
+    games: int
+    low_sample: bool  # fewer than MIN_SAMPLE games: show it, but draw no conclusion from it
+    score_pct: float | None = None
+    # 95% interval on the score, so a 70% from 12 games reads as the wide guess it is.
+    score_low_pct: float | None = None
+    score_high_pct: float | None = None
+    accuracy: float | None = None
+    accuracy_games: int = 0
+    blunders_per_game: float = 0
+
+
+class ScheduleBreakdown(BaseModel):
+    rows: list[ScheduleRow]
+    # Set only when the best and worst rows both have enough games and their intervals do
+    # not overlap. Otherwise the differences are within noise and nothing is called out.
+    best: str | None = None
+    worst: str | None = None
+
+
+class ScheduleSection(BaseModel):
+    sample_size: int  # games with a start time
+    undated_games: int  # games left out because they have none
+    timezone: str  # the timezone used, which is UTC if the requested one was unknown
+    by_time_of_day: ScheduleBreakdown
+    by_day_of_week: ScheduleBreakdown
 
 
 class OpponentRow(BaseModel):
@@ -218,6 +262,7 @@ class InsightsResponse(BaseModel):
     opponents: OpponentSection
     colors: ColorSection
     conversion: ConversionSection
+    schedule: ScheduleSection
 
 
 # --------------------------------------------------------------------------- helpers
@@ -251,6 +296,24 @@ def time_category(time_control: str) -> TimeCategory | None:
     if estimate < 600:
         return "blitz"
     return "rapid"
+
+
+def resolve_timezone(name: str | None) -> tuple[tzinfo, str]:
+    """The named IANA timezone, or UTC when it is missing or this system does not know it."""
+    if name:
+        try:
+            return ZoneInfo(name), name
+        except (ZoneInfoNotFoundError, ValueError, OSError):
+            pass
+    return UTC, "UTC"
+
+
+def wilson_interval(score: float, n: int) -> tuple[float, float]:
+    """95% Wilson interval, in percent, for a score (0-1) over ``n`` games."""
+    z2 = WILSON_Z**2
+    centre = (score + z2 / (2 * n)) / (1 + z2 / n)
+    margin = WILSON_Z * sqrt(score * (1 - score) / n + z2 / (4 * n * n)) / (1 + z2 / n)
+    return round(max(0.0, centre - margin) * 100, 1), round(min(1.0, centre + margin) * 100, 1)
 
 
 def judgment_for(severity: float) -> str | None:
@@ -319,6 +382,7 @@ class _Game:
     opponent_elo: int | None
     termination: str | None
     moves: list[dict[str, Any]]
+    started_at: datetime | None = None
     moments: list[_Moment] = field(default_factory=list)
 
 
@@ -331,13 +395,14 @@ def _load_games(session: Session, player_id: str, last: int) -> list[_Game]:
             GameRow.time_control,
             GameRow.player_elo,
             GameRow.metadata_json,
+            GameRow.started_at,
         )
         .where(GameRow.player_id == player_id)
         .order_by(GameRow.played_at.desc(), GameRow.created_at.desc())
         .limit(last)
     ).all()
     games: dict[str, _Game] = {}
-    for row_id, color, result, time_control, elo, stored in rows:
+    for row_id, color, result, time_control, elo, stored, started_at in rows:
         if color not in ("white", "black") or result not in ("win", "draw", "loss"):
             continue
         stored = stored or {}
@@ -352,6 +417,7 @@ def _load_games(session: Session, player_id: str, last: int) -> list[_Game]:
             opponent_elo=_opponent_elo(meta, color),
             termination=termination if isinstance(termination, str) else None,
             moves=stored.get("moves") or [],
+            started_at=started_at,
         )
     moment_rows = session.execute(
         select(
@@ -391,7 +457,9 @@ def _held(series: list[float], test: Callable[[float], bool]) -> bool:
 # --------------------------------------------------------------------------- build
 
 
-def build_insights(session: Session, player: PlayerRow, last: int, total_games: int) -> InsightsResponse:
+def build_insights(
+    session: Session, player: PlayerRow, last: int, total_games: int, timezone: str | None = None
+) -> InsightsResponse:
     games = _load_games(session, player.id, last)
     engine_games = [g for g in games if _has_engine(g.moves)]
     clock_games = [g for g in engine_games if _has_clock(g.moves)]
@@ -424,6 +492,7 @@ def build_insights(session: Session, player: PlayerRow, last: int, total_games: 
         opponents=opponents,
         colors=colors,
         conversion=conversion,
+        schedule=_schedule_section(games, accuracy_by_game, timezone),
     )
 
 
@@ -599,6 +668,65 @@ def _color_section(games: list[_Game], accuracy_by_game: dict[str, float]) -> Co
         )
     return ColorSection(
         sample_size=len(games), accuracy_sample_size=len(accuracy_by_game), rows=rows
+    )
+
+
+def _schedule_row(
+    key: str, label: str, members: list[_Game], accuracy_by_game: dict[str, float]
+) -> ScheduleRow:
+    n = len(members)
+    row = ScheduleRow(key=key, label=label, games=n, low_sample=n < MIN_SAMPLE)
+    if not n:
+        return row
+    score = sum(_score(g.result) or 0.0 for g in members) / n
+    accs = [accuracy_by_game[g.row_id] for g in members if g.row_id in accuracy_by_game]
+    blunders = sum(1 for g in members for m in g.moments if m.severity >= BLUNDER_PCT)
+    row.score_pct = round(score * 100, 1)
+    row.score_low_pct, row.score_high_pct = wilson_interval(score, n)
+    row.accuracy = _mean(accs)
+    row.accuracy_games = len(accs)
+    row.blunders_per_game = round(blunders / n, 2)
+    return row
+
+
+def _breakdown(rows: list[ScheduleRow]) -> ScheduleBreakdown:
+    solid = [row for row in rows if not row.low_sample]
+    if len(solid) < 2:
+        return ScheduleBreakdown(rows=rows)
+    best = max(solid, key=lambda row: row.score_pct or 0)
+    worst = min(solid, key=lambda row: row.score_pct or 0)
+    if (best.score_low_pct or 0) <= (worst.score_high_pct or 0):
+        return ScheduleBreakdown(rows=rows)
+    return ScheduleBreakdown(rows=rows, best=best.key, worst=worst.key)
+
+
+def _schedule_section(
+    games: list[_Game], accuracy_by_game: dict[str, float], timezone: str | None
+) -> ScheduleSection:
+    zone, zone_name = resolve_timezone(timezone)
+    parts: dict[str, list[_Game]] = defaultdict(list)
+    days: dict[int, list[_Game]] = defaultdict(list)
+    dated = [g for g in games if g.started_at is not None]
+    for game in dated:
+        started = game.started_at
+        # SQLite drops the offset; stored values are always UTC.
+        local = (started if started.tzinfo else started.replace(tzinfo=UTC)).astimezone(zone)
+        part = next(key for key, _, hour in reversed(DAY_PARTS) if local.hour >= hour)
+        parts[part].append(game)
+        days[local.weekday()].append(game)
+    return ScheduleSection(
+        sample_size=len(dated),
+        undated_games=len(games) - len(dated),
+        timezone=zone_name,
+        by_time_of_day=_breakdown(
+            [_schedule_row(key, label, parts[key], accuracy_by_game) for key, label, _ in DAY_PARTS]
+        ),
+        by_day_of_week=_breakdown(
+            [
+                _schedule_row(label.lower(), label, days[index], accuracy_by_game)
+                for index, label in enumerate(WEEKDAYS)
+            ]
+        ),
     )
 
 

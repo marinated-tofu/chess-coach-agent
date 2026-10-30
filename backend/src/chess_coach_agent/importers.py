@@ -156,6 +156,7 @@ def preview_pgn_games(
                 black=metadata.black,
                 result=metadata.result,
                 date=metadata.date,
+                started_at=metadata.started_at,
                 time_control=metadata.time_control,
                 link=metadata.link,
                 player_color=metadata.player_color,
