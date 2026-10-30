@@ -434,7 +434,8 @@ def evaluate_attempt(
             before_cp = max(-1000, min(1000, before.score_cp))
             after_cp = max(-1000, min(1000, after.score_cp))
             cp_loss = round(max(0, before_cp - after_cp) / 100, 2)
-            correct = correct or cp_loss <= 0.5
+            # A heuristic eval is too rough to accept a move the answer key rejects.
+            correct = correct or (engine_backed and cp_loss <= 0.5)
             win_chance_loss = max(
                 0.0, winning_chances(before.score_cp) - winning_chances(after.score_cp)
             )
