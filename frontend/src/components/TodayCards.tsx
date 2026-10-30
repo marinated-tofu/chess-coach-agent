@@ -9,6 +9,7 @@ import { formatPgnDate, type TodaySummary } from '../lib/todayApi';
 import type { Platform } from '../lib/types';
 import { ChessBoard } from './ChessBoard';
 import { Skeleton } from './Skeleton';
+import { isAccessDenied } from '../lib/access';
 
 type CardProps = { player: string; platform: Platform; primary: boolean };
 
@@ -47,6 +48,7 @@ function CardState({ query, label, children }: {
   children: () => ReactNode;
 }) {
   if (query.isPending) return <DelayedSkeleton label={`Loading ${label}`} />;
+  if (isAccessDenied(query.error)) return <p className="today-card-body">This player's {label.replace(/^your /, '')} is private.</p>;
   if (query.isError) {
     return (
       <p className="today-card-error" role="alert">

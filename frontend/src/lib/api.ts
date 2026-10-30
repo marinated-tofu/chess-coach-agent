@@ -1,3 +1,4 @@
+import { throwIfDenied } from './access';
 import type {
   AnalyzeResponse,
   CoachAskResponse,
@@ -85,6 +86,7 @@ export async function createTrainingSession(
       mode
     })
   });
+  await throwIfDenied(response);
   if (!response.ok) throw new Error(await errorMessage(response, 'Could not build training session'));
   return response.json();
 }
@@ -95,6 +97,7 @@ export async function createTimeTrainerSession(username: string, platform: Platf
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, platform, position_count: 5, mode: 'time' })
   });
+  await throwIfDenied(response);
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { detail?: string } | null;
     throw new Error(body?.detail || 'Could not start the time trainer');
@@ -104,6 +107,7 @@ export async function createTimeTrainerSession(username: string, platform: Platf
 
 export async function getTrainingSession(sessionId: string): Promise<TrainingSession> {
   const response = await fetch(`/api/training/sessions/${sessionId}`);
+  await throwIfDenied(response);
   if (!response.ok) throw new Error(await errorMessage(response, 'Could not load training session'));
   return response.json();
 }
@@ -120,6 +124,7 @@ export async function submitTrainingAttempt(
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ position_id: positionId, move, hints_used: hintsUsed, elapsed_ms: elapsedMs, timed_out: timedOut })
   });
+  await throwIfDenied(response);
   if (!response.ok) throw new Error(await errorMessage(response, 'Could not evaluate move'));
   return response.json();
 }

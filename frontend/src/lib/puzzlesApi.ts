@@ -1,3 +1,4 @@
+import { isDeniedStatus } from './access';
 import type { Platform } from './types';
 
 export interface PuzzleThemeOption {
@@ -27,6 +28,8 @@ export interface PuzzlePage {
   offset: number;
   limit: number;
   puzzles: PuzzleSummary[];
+  /** The current player is private: this is the plain library, and results are not saved. */
+  private?: boolean;
 }
 
 export interface PuzzleFilters {
@@ -76,11 +79,18 @@ export async function getPuzzles(
   if (filters.theme) params.set('theme', filters.theme);
   if (filters.minRating != null) params.set('min_rating', String(filters.minRating));
   if (filters.maxRating != null) params.set('max_rating', String(filters.maxRating));
+  const library = `/api/puzzles?${params}`;
   if (player.username && player.platform) {
     params.set('username', player.username);
     params.set('platform', player.platform);
   }
   const response = await fetch(`/api/puzzles?${params}`);
+  if (isDeniedStatus(response.status)) {
+    // The puzzles are public; only this player's results are not.
+    const plain = await fetch(library);
+    if (!plain.ok) throw new Error('Could not load puzzles');
+    return { ...(await plain.json()), private: true };
+  }
   if (!response.ok) throw new Error('Could not load puzzles');
   return response.json();
 }

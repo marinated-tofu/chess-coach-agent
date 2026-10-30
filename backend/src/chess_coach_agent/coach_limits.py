@@ -133,7 +133,13 @@ def give_back_question(session: Session, scope: QuotaScope) -> None:
 def limit_reached(scope: QuotaScope) -> HTTPException:
     limit = scope.limit
     questions = f"{limit} coach {'question' if limit == 1 else 'questions'}"
-    if scope.plan == "anonymous":
+    if limit == 0:
+        message = (
+            "Coach questions need an account. Sign in with Lichess to ask."
+            if scope.plan == "anonymous"
+            else "Coach questions aren't available on this plan today."
+        )
+    elif scope.plan == "anonymous":
         message = f"You've used your {questions} for today. Sign in with Lichess to ask more."
     else:
         message = f"You've used your {questions} for today. Your limit resets at midnight UTC."

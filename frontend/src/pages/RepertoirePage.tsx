@@ -23,6 +23,8 @@ import {
 } from '../lib/repertoireApi';
 import { useWorkspace } from '../workspace/WorkspaceContext';
 import './RepertoirePage.css';
+import { isAccessDenied } from '../lib/access';
+import { PrivatePlayerNotice } from '../components/PrivatePlayerNotice';
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const PLAYER_ARROW = 'rgba(21, 120, 75, 0.7)';
@@ -193,6 +195,8 @@ export function RepertoirePage() {
 
       {!player.trim() ? (
         <div className="empty-route"><h2>Pick a player first</h2><p>Load your games from the Games page.</p></div>
+      ) : isAccessDenied(list.error) ? (
+        <PrivatePlayerNotice error={list.error} />
       ) : list.isError ? (
         <div className="empty-route"><h2>No games yet</h2><p>{(list.error as Error).message}</p></div>
       ) : loading ? (

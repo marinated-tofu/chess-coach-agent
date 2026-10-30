@@ -492,6 +492,19 @@ def test_free_user_gets_a_clear_429_at_the_limit(monkeypatch):
     assert client.get("/api/auth/me").json()["coach_quota"]["used"] == 2
 
 
+def test_a_limit_of_zero_does_not_claim_questions_were_used(monkeypatch):
+    monkeypatch.setenv("COACH_DAILY_LIMIT_FREE", "0")
+    monkeypatch.setenv("COACH_DAILY_LIMIT_ANONYMOUS", "0")
+
+    signed_in = _client(_user()).post("/api/coach/ask", json=QUESTION)
+    assert signed_in.status_code == 429
+    assert "0 coach questions" not in signed_in.json()["detail"]
+
+    anonymous = TestClient(app).post("/api/coach/ask", json=QUESTION)
+    assert anonymous.status_code == 429
+    assert "Sign in" in anonymous.json()["detail"]
+
+
 def test_paid_plan_has_its_own_limit(monkeypatch):
     monkeypatch.setenv("COACH_DAILY_LIMIT_FREE", "0")
     monkeypatch.setenv("COACH_DAILY_LIMIT_PAID", "1")

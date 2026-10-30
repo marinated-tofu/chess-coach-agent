@@ -1,3 +1,4 @@
+import { throwIfDenied } from './access';
 import type { Platform } from './types';
 
 export type PlanTaskKind = 'due_review' | 'leak_practice' | 'game_review' | 'repertoire_review' | 'repertoire_build';
@@ -63,6 +64,7 @@ function planUrl(username: string, platform: Platform) {
 
 export async function getStudyPlan(username: string, platform: Platform): Promise<StudyPlanResponse> {
   const response = await fetch(`${planUrl(username, platform)}?today=${localDate()}`);
+  await throwIfDenied(response);
   if (!response.ok) throw new Error('Could not load your study plan');
   return response.json();
 }
@@ -73,6 +75,7 @@ export async function createStudyPlan(username: string, platform: Platform): Pro
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ today: localDate() })
   });
+  await throwIfDenied(response);
   if (!response.ok) throw new Error('Could not build your study plan');
   return response.json();
 }

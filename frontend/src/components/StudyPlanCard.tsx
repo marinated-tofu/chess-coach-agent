@@ -7,6 +7,7 @@ import { createStudyPlan, getStudyPlan, studyPlanKey, type PlanTask, type StudyP
 import type { Platform } from '../lib/types';
 import { Skeleton } from './Skeleton';
 import './StudyPlanCard.css';
+import { isAccessDenied } from '../lib/access';
 
 const ACTION_LABEL: Record<PlanTask['kind'], string> = {
   due_review: 'Start review',
@@ -141,7 +142,8 @@ export function StudyPlanCard({ player, platform }: { player: string; platform: 
         <h2 id="plan-title">This week's plan</h2>
       </header>
       {query.isPending && <Skeleton lines={3} label="Loading your study plan" />}
-      {query.isError && (
+      {isAccessDenied(query.error) && <p className="today-card-body">This player's plan is private.</p>}
+      {query.isError && !isAccessDenied(query.error) && (
         <p className="today-card-error" role="alert">
           <AlertCircle size={15} /> Could not load your study plan.
           <button type="button" className="today-text-button" onClick={() => void query.refetch()}>Retry</button>

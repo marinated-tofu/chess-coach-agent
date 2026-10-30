@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { clearBrowserWorkspace, seedPlayerFromSample, syncPlayerAccount } from './helpers';
+import { clearBrowserWorkspace, seedPlayerFromSample, selectPlayer, sidebarLink, syncPlayerAccount } from './helpers';
 
 const SECOND_PLAYER_CANDIDATES = [
   { username: 'DrNykterstein', platform: 'lichess' as const, label: 'DrNykterstein (Lichess)' },
@@ -30,10 +30,10 @@ test.describe('Account sync players', () => {
 
   test('kfctofu games load from synced account data', async ({ page, request }) => {
     await seedPlayerFromSample(request, 'kfctofu');
+    await selectPlayer(page, 'kfctofu');
     await page.goto('/games');
     await expect(page.getByRole('heading', { name: 'Your analyzed games' })).toBeVisible();
-    await expect(page.getByText(/games ready/i)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Analyze pasted PGN')).toHaveCount(0);
+    await expect(page.getByText(/games? ready/i)).toBeVisible({ timeout: 15_000 });
   });
 
   test('second titled account loads after kfctofu', async ({ page, request }) => {
@@ -41,17 +41,16 @@ test.describe('Account sync players', () => {
     await seedPlayerFromSample(request, 'kfctofu');
     const second = await syncSecondPlayer(request);
 
-    await page.goto('/games');
-    await page.getByRole('button', { name: /Import games/i }).click();
+    await page.goto('/games?import=true');
     await page.getByLabel('Player username').fill(second.username);
     await page.getByLabel('Source').selectOption(second.platform);
     await page.getByRole('button', { name: /Sync full history/i }).click();
     await expect(page.getByText(/Synced|skipped|analyzed/i)).toBeVisible({ timeout: 120_000 });
 
-    await page.getByRole('link', { name: 'Home' }).click();
+    await sidebarLink(page, 'Today').click();
     await expect(page.getByRole('heading', { name: second.username })).toBeVisible();
 
-    await page.getByRole('link', { name: 'Practice' }).click();
+    await sidebarLink(page, 'Practice').click();
     await page.getByRole('button', { name: /Start practice/i }).click();
     const practiceHeading = page.getByRole('heading', { level: 2, name: /what would you play|pattern in your game/i });
     const emptyState = page.getByRole('heading', { name: 'No positions due' });

@@ -106,7 +106,7 @@ def default_quiz_copy(position: TrainingPositionRow) -> tuple[str, str | None]:
     if position.source == "puzzle":
         prompt = f"Lichess puzzle on {theme_label}: find the best move."
     else:
-        prompt = f"You had a {theme_label} pattern in your game — what would you play?"
+        prompt = f"{theme_label.capitalize()} pattern in your game — what would you play?"
     hint = None
     if position.difficulty == "beginner":
         hint = (
