@@ -1,0 +1,112 @@
+[
+  {
+    "id": "opposition-key-square",
+    "title": "Reach a key square",
+    "category": "King and pawn",
+    "fen": "8/4k3/8/8/3K4/4P3/8/8 w - - 0 1",
+    "goal": "win",
+    "finish": "engine",
+    "move_limit": 30,
+    "summary": "A pawn on e3 wins if your king reaches d5, e5 or f5. Get there before you push the pawn.",
+    "hint": "Ke5 or Kd5 steps straight onto a key square. Kc5 lets Black take the opposition and draw."
+  },
+  {
+    "id": "opposition-sixth-rank",
+    "title": "King on the sixth",
+    "category": "King and pawn",
+    "fen": "4k3/8/4K3/4P3/8/8/8/8 w - - 0 1",
+    "goal": "win",
+    "finish": "engine",
+    "move_limit": 20,
+    "summary": "With your king on the sixth rank in front of a non-rook pawn, the win is there whoever has the move.",
+    "hint": "Step beside the pawn with Kd6 or Kf6, not back. After e6 and e7 your king covers the promotion square."
+  },
+  {
+    "id": "opposition-hold",
+    "title": "Take the opposition",
+    "category": "King and pawn",
+    "fen": "8/8/4k3/8/3K4/4P3/8/8 b - - 0 1",
+    "goal": "draw",
+    "finish": "engine",
+    "move_limit": 20,
+    "summary": "As the defender, stand directly in front of the enemy king with one square between you.",
+    "hint": "Only Kd6 holds. Every other king move lets White walk onto a key square."
+  },
+  {
+    "id": "rook-pawn-corner",
+    "title": "Sit in the corner",
+    "category": "King and pawn",
+    "fen": "7k/8/5K2/8/7P/8/8/8 b - - 0 1",
+    "goal": "draw",
+    "finish": "engine",
+    "move_limit": 15,
+    "summary": "A rook pawn cannot force the defending king out of the corner.",
+    "hint": "Shuffle between h8, h7 and g8. Stalemate is your friend here."
+  },
+  {
+    "id": "pawn-breakthrough",
+    "title": "Three-pawn breakthrough",
+    "category": "King and pawn",
+    "fen": "6k1/ppp5/8/PPP5/8/8/8/6K1 w - - 0 1",
+    "goal": "win",
+    "finish": "engine",
+    "move_limit": 12,
+    "summary": "Three pawns against three, with both kings too far away. One pawn sacrifice decides it.",
+    "hint": "Start with b6. After axb6 play c6, and after cxb6 play a6. One pawn gets through."
+  },
+  {
+    "id": "lucena",
+    "title": "Lucena position",
+    "category": "Rook endgames",
+    "fen": "1K1k4/1P6/8/8/8/8/r7/2R5 w - - 0 1",
+    "goal": "win",
+    "finish": "engine",
+    "move_limit": 30,
+    "summary": "Your king is shut in front of its own pawn. Build a bridge with the rook so it can step out.",
+    "hint": "Check the enemy king further away, put the rook on the fourth rank, then walk your king out. The rook blocks the checks."
+  },
+  {
+    "id": "philidor",
+    "title": "Philidor defence",
+    "category": "Rook endgames",
+    "fen": "4k3/R7/7r/4P3/4K3/8/8/8 b - - 0 1",
+    "goal": "draw",
+    "finish": "engine",
+    "move_limit": 25,
+    "summary": "Keep your rook on the sixth rank so the enemy king cannot advance. Once the pawn moves to the sixth, drop to the back and check from behind.",
+    "hint": "Stay on the sixth rank while the pawn is on e5. When e6 comes, go to the first or second rank and give checks from far away."
+  },
+  {
+    "id": "queen-mate",
+    "title": "Queen mate",
+    "category": "Basic mates",
+    "fen": "8/8/8/3k4/8/8/8/Q3K3 w - - 0 1",
+    "goal": "win",
+    "finish": "mate",
+    "move_limit": 25,
+    "summary": "Box the king against an edge with the queen, then bring your own king up to finish.",
+    "hint": "Keep the queen a knight's move from the enemy king as it retreats. Watch for stalemate once it reaches the corner."
+  },
+  {
+    "id": "rook-mate",
+    "title": "Rook mate",
+    "category": "Basic mates",
+    "fen": "8/8/8/3k4/8/8/8/R3K3 w - - 0 1",
+    "goal": "win",
+    "finish": "mate",
+    "move_limit": 35,
+    "summary": "Cut the board with the rook, bring your king opposite the enemy king, and push it back one rank at a time.",
+    "hint": "Check only when the kings stand in opposition. Otherwise make a waiting move along the rank with the rook."
+  },
+  {
+    "id": "two-bishops-mate",
+    "title": "Two bishops mate",
+    "category": "Basic mates",
+    "fen": "8/8/8/3k4/8/8/8/2B1KB2 w - - 0 1",
+    "goal": "win",
+    "finish": "mate",
+    "move_limit": 40,
+    "summary": "Bishops side by side form a wall the king cannot cross. Drive it to a corner with your king's help.",
+    "hint": "Keep the bishops next to each other and away from the enemy king. Mate comes in a corner, not on the edge."
+  }
+]

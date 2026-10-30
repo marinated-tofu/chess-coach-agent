@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { ArrowRight, CheckCircle2, FlipVertical2, Home, Loader2, RotateCcw, Target } from 'lucide-react';
 import { ARROW_COLORS, ChessBoard, type BoardArrow } from '../components/ChessBoard';
 import { CoachPanel } from '../components/CoachPanel';
@@ -79,7 +79,7 @@ function QueuePanel({ queue, busy, onStart, onPuzzles }: {
             onStarted={(session) => onPuzzles(session.id)}
           />
         </div>
-        <p className="practice-start-note">Sessions hold five positions. Themed puzzles come from the Lichess library and target your most common weakness.</p>
+        <p className="practice-start-note">Sessions hold five positions. Themed puzzles come from the Lichess library and target your most common weakness. Endgame reviews run on the <Link to="/endgames">Endgames</Link> page.</p>
       </div>
     </section>
   );

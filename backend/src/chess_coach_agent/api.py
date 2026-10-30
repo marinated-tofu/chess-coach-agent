@@ -21,6 +21,7 @@ from .models import (
 from .monitoring import log_event, monitoring_summary
 from .adaptive_api import router as adaptive_router
 from .openings_api import router as openings_router
+from .endgames_api import router as endgames_router
 from .engine_api import router as engine_router
 from .bots_api import router as bots_router
 from .insights_api import router as insights_router
@@ -46,6 +47,7 @@ agent = ChessCoachAgent()
 app.include_router(adaptive_router)
 app.include_router(openings_router)
 app.include_router(engine_router)
+app.include_router(endgames_router)
 app.include_router(bots_router)
 app.include_router(insights_router)
 app.include_router(vision_router)
