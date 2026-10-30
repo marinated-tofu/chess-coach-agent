@@ -235,9 +235,13 @@ def build_due_session(
     due = session.execute(
         select(ReviewScheduleRow, TrainingPositionRow)
         .join(TrainingPositionRow, TrainingPositionRow.id == ReviewScheduleRow.position_id)
+        .join(TrainingPlanRow, TrainingPlanRow.id == TrainingPositionRow.plan_id)
         .where(
             ReviewScheduleRow.player_id == player.id,
             ReviewScheduleRow.due_at <= datetime.now(UTC),
+            # Library puzzles aren't re-served, and endgames are played out on /endgames.
+            TrainingPlanRow.status != LIBRARY_PLAN_STATUS,
+            TrainingPositionRow.source.not_like("endgame%"),
         )
         .order_by(ReviewScheduleRow.due_at)
     ).all()

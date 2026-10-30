@@ -148,7 +148,8 @@ export function PracticePage({ sessionId, mode }: { sessionId?: string; mode?: '
   async function start() {
     setBusy(true);
     try {
-      const created = await createTrainingSession(workspace.player, workspace.platform);
+      // Serves due reviews first; the server falls back to a mixed session when none are due.
+      const created = await createTrainingSession(workspace.player, workspace.platform, undefined, undefined, 'due');
       await navigate({ to: '/practice/$sessionId', params: { sessionId: created.id } });
     } finally {
       setBusy(false);

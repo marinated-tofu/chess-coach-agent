@@ -588,7 +588,7 @@ def test_account_migration_upgrades_downgrades_and_matches_the_models(tmp_path):
             text=True,
         )
 
-    for args in (("upgrade", "head"), ("downgrade", "-1"), ("upgrade", "head")):
+    for args in (("upgrade", "head"), ("downgrade", "d4f7b9e2c1a8"), ("upgrade", "head")):
         result = alembic(*args)
         assert result.returncode == 0, result.stdout + result.stderr
     # `check` also reports drift that predates accounts, so look only at the account tables.
