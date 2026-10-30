@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import chess
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from chess_coach_agent.api import app
 from chess_coach_agent.db import session_scope
 from chess_coach_agent.db_models import CriticalMomentRow, GameRow
-from chess_coach_agent.insights import phase_from_fen, time_category
+from chess_coach_agent.insights import (
+    ScheduleRow,
+    _breakdown,
+    phase_from_fen,
+    time_category,
+    wilson_interval,
+)
 from chess_coach_agent.pgn import phase_for_board
 from chess_coach_agent.repositories import get_or_create_player
 
@@ -212,3 +221,95 @@ def test_time_category():
     assert time_category("600") == "rapid"
     assert time_category("1/86400") == "daily"
     assert time_category("") is None
+
+
+# --------------------------------------------------------------------- time of day, weekday
+
+
+def _seed_dated(username: str, starts: list[tuple[datetime | None, str]]) -> None:
+    with session_scope() as session:
+        player = get_or_create_player(session, "chess.com", username)
+        for number, (started_at, result) in enumerate(starts):
+            session.add(
+                GameRow(
+                    player_id=player.id,
+                    external_game_id=f"{username}-{number}",
+                    white=username,
+                    black="opp",
+                    result="*",
+                    player_result=result,
+                    player_color="white",
+                    played_at=f"2026.01.{number % 28 + 1:02d}",
+                    started_at=started_at,
+                    time_control="600",
+                    metadata_json={"game": {}, "moves": []},
+                )
+            )
+
+
+def _rows(breakdown: dict) -> dict:
+    return {row["key"]: row for row in breakdown["rows"]}
+
+
+def test_schedule_buckets_in_the_players_timezone_and_counts_undated_games():
+    # Friday 2026-01-02 23:30 UTC is Saturday 07:30 in Manila.
+    late_friday = datetime(2026, 1, 2, 23, 30, tzinfo=UTC)
+    _seed_dated("sched-tz", [(late_friday, "win"), (None, "loss")])
+    with TestClient(app) as client:
+        utc = client.get("/api/insights/chess.com/sched-tz").json()["schedule"]
+        manila = client.get("/api/insights/chess.com/sched-tz?tz=Asia/Manila").json()["schedule"]
+        unknown = client.get("/api/insights/chess.com/sched-tz?tz=Mars/Olympus").json()["schedule"]
+    assert (utc["timezone"], utc["sample_size"], utc["undated_games"]) == ("UTC", 1, 1)
+    assert _rows(utc["by_time_of_day"])["evening"]["games"] == 1
+    assert _rows(utc["by_day_of_week"])["fri"]["games"] == 1
+    assert manila["timezone"] == "Asia/Manila"
+    assert _rows(manila["by_time_of_day"])["morning"]["games"] == 1
+    assert _rows(manila["by_day_of_week"])["sat"]["games"] == 1
+    assert unknown["timezone"] == "UTC"
+
+
+def test_schedule_marks_small_samples_and_only_calls_out_clear_gaps():
+    # Mornings are all wins and afternoons all losses, but 5 games of each prove nothing.
+    day = datetime(2026, 1, 5, tzinfo=UTC)
+    small = [(day.replace(hour=8), "win")] * 5 + [(day.replace(hour=14), "loss")] * 5
+    _seed_dated("sched-small", small)
+    large = [(day.replace(hour=8), "win")] * 30 + [(day.replace(hour=14), "loss")] * 30
+    _seed_dated("sched-large", large)
+    with TestClient(app) as client:
+        few = client.get("/api/insights/chess.com/sched-small").json()["schedule"]["by_time_of_day"]
+        many = client.get("/api/insights/chess.com/sched-large").json()["schedule"]["by_time_of_day"]
+    morning = _rows(few)["morning"]
+    assert morning["low_sample"] is True and morning["score_pct"] == 100
+    assert morning["score_low_pct"] < 60  # 5 of 5 is a wide guess, and the interval says so
+    assert _rows(few)["night"]["score_pct"] is None
+    assert few["best"] is None and few["worst"] is None
+    assert _rows(many)["morning"]["low_sample"] is False
+    assert (many["best"], many["worst"]) == ("morning", "afternoon")
+
+
+def test_overlapping_intervals_are_not_called_a_difference():
+    rows = [
+        ScheduleRow(
+            key=key,
+            label=key,
+            games=20,
+            low_sample=False,
+            score_pct=score * 100,
+            score_low_pct=wilson_interval(score, 20)[0],
+            score_high_pct=wilson_interval(score, 20)[1],
+        )
+        for key, score in (("a", 0.55), ("b", 0.45))
+    ]
+    assert _breakdown(rows).best is None
+
+
+def test_cached_insights_refresh_when_a_sync_adds_start_times():
+    _seed_dated("sched-backfill", [(None, "win")])
+    with TestClient(app) as client:
+        before = client.get("/api/insights/chess.com/sched-backfill").json()["schedule"]
+        with session_scope() as session:
+            player = get_or_create_player(session, "chess.com", "sched-backfill")
+            game = session.scalar(select(GameRow).where(GameRow.player_id == player.id))
+            game.started_at = datetime(2026, 1, 5, 9, tzinfo=UTC)
+        after = client.get("/api/insights/chess.com/sched-backfill").json()["schedule"]
+    assert (before["sample_size"], after["sample_size"]) == (0, 1)

@@ -10,17 +10,20 @@ Stored puzzle shape (one JSON object per line in ``data/puzzles/puzzles.jsonl``)
      "theme": "missed_tactic", "tags": ["fork", "middlegame", ...]}
 
 ``fen`` is already the position the player must solve, so ``solution[0]`` is the
-player's first move. Grading uses only that first move today; the full line is kept
-for multi-move support later.
+player's first move. Practice sessions grade only that first move; the puzzle page plays
+the full line (see ``check_line``).
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
+
+import chess
 
 PUZZLE_PATH = Path(__file__).resolve().parents[2] / "data" / "puzzles" / "puzzles.jsonl"
 
@@ -81,6 +84,16 @@ LICHESS_THEME_MAP: dict[str, tuple[str, ...]] = {
 # (time_pressure, candidate_move_discipline, ...) map to None: puzzles are untimed, so
 # those players get a mixed pool across all themes.
 THEME_ALIASES: dict[str, str] = {"loose_pieces": "loose_piece", "missed_tactics": "missed_tactic"}
+
+# Puzzle page names. opening_drift and king_safety describe what the puzzles actually drill;
+# see data/puzzles/README.md.
+THEME_LABELS: dict[str, str] = {
+    "loose_piece": "Hanging pieces",
+    "endgame_conversion": "Endgames",
+    "opening_drift": "Opening tactics",
+    "king_safety": "King attacks",
+    "missed_tactic": "Tactics",
+}
 
 DEFAULT_RATING = 1400
 RATING_WINDOWS = (100, 200, 350, 600, 2000)
@@ -189,5 +202,72 @@ def _round_robin(puzzles: list[Puzzle], count: int) -> list[Puzzle]:
     return chosen
 
 
+@lru_cache(maxsize=1)
+def _by_id() -> dict[str, Puzzle]:
+    return {item.id: item for item in _load_default()}
+
+
 def get_puzzle(puzzle_id: str) -> Puzzle | None:
-    return next((item for item in _load_default() if item.id == puzzle_id), None)
+    return _by_id().get(puzzle_id)
+
+
+def filter_puzzles(
+    theme: str | None = None,
+    min_rating: int | None = None,
+    max_rating: int | None = None,
+    puzzles: Iterable[Puzzle] | None = None,
+) -> list[Puzzle]:
+    """Puzzles for ``theme`` (None or unknown means every theme) within the rating range,
+    easiest first. Unlike ``select_puzzles`` the range is strict: it never widens.
+    """
+    wanted = normalize_theme(theme)
+    pool = puzzles if puzzles is not None else _load_default()
+    return sorted(
+        (
+            item
+            for item in pool
+            if (wanted is None or item.theme == wanted)
+            and (min_rating is None or item.rating >= min_rating)
+            and (max_rating is None or item.rating <= max_rating)
+        ),
+        key=lambda item: (item.rating, item.id),
+    )
+
+
+@dataclass(frozen=True)
+class LineCheck:
+    status: Literal["continue", "solved", "wrong"]
+    reply: str | None = None  # the opponent's answer in UCI, when status is "continue"
+
+
+def check_line(puzzle: Puzzle, line: Sequence[str]) -> LineCheck:
+    """Grade the newest move of ``line``, the UCI moves played so far from ``puzzle.fen``.
+
+    Any move that gives checkmate solves the puzzle, as on Lichess. Raises ValueError when
+    the line is not a position the player can be in: everything before the newest move must
+    follow the solution, and the newest move must be the player's and legal.
+    """
+    index = len(line) - 1
+    if index < 0 or index % 2 == 1 or index >= len(puzzle.solution):
+        raise ValueError("Line does not end on the player's move")
+    if list(line[:index]) != list(puzzle.solution[:index]):
+        raise ValueError("Line left the solution")
+    board = chess.Board(puzzle.fen)
+    for uci in line[:index]:
+        board.push_uci(uci)
+    try:
+        board.push_uci(line[index])
+    except ValueError as exc:
+        raise ValueError("Illegal move") from exc
+    if board.is_checkmate():
+        return LineCheck("solved")
+    if line[index] != puzzle.solution[index]:
+        return LineCheck("wrong")
+    if index + 1 >= len(puzzle.solution):
+        return LineCheck("solved")
+    return LineCheck("continue", reply=puzzle.solution[index + 1])
+
+
+def solution_sans(puzzle: Puzzle) -> list[str]:
+    board = chess.Board(puzzle.fen)
+    return [board.san_and_push(chess.Move.from_uci(uci)) for uci in puzzle.solution]

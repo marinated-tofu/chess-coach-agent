@@ -67,6 +67,7 @@ class GameMetadata(BaseModel):
     black: str
     result: str
     date: str = "????.??.??"
+    started_at: datetime | None = None  # UTC start time, when the PGN has one
     link: str = ""
     eco: str = ""
     time_control: str = ""
@@ -248,6 +249,7 @@ class GamePreview(BaseModel):
     black: str
     result: str
     date: str
+    started_at: datetime | None = None
     time_control: str = ""
     link: str = ""
     player_color: Literal["white", "black", "unknown"]

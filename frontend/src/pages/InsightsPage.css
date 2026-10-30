@@ -327,6 +327,33 @@
 
 .insights-pair > .insights-section:only-child { grid-column: 1 / -1; }
 
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  margin-top: 12px;
+}
+
+.schedule-block { min-width: 0; }
+
+.schedule-block h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.schedule-verdict {
+  margin: 4px 0 8px;
+  color: var(--gray-700);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.schedule-table { overflow-x: auto; }
+
+.schedule-thin > * { color: var(--insights-muted); }
+.schedule-thin > th { font-weight: 500; }
+
 .insights-missing {
   display: flex;
   flex-wrap: wrap;
@@ -372,6 +399,7 @@
   .leak-grid { grid-template-columns: 1fr; }
   .insights-split { grid-template-columns: 1fr; }
   .insights-pair { grid-template-columns: 1fr; }
+  .schedule-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {

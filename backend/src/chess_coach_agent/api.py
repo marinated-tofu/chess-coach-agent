@@ -31,6 +31,7 @@ from .explorer_api import router as explorer_router
 from .repertoire_api import router as repertoire_router
 from .today_api import router as today_router
 from .library_api import router as library_router
+from .puzzles_api import router as puzzles_router
 from .db import init_db, session_scope
 from .repositories import persist_analyses
 
@@ -55,6 +56,7 @@ app.include_router(explorer_router)
 app.include_router(repertoire_router)
 app.include_router(today_router)
 app.include_router(library_router)
+app.include_router(puzzles_router)
 
 app.add_middleware(
     CORSMiddleware,

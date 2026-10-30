@@ -8,6 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .db_models import (
+    LIBRARY_PLAN_STATUS,
     AnalysisRow,
     CriticalMomentRow,
     GameRow,
@@ -121,6 +122,8 @@ def persist_analyses(
         game.player_color = metadata.player_color
         game.player_elo = metadata.player_elo
         game.played_at = metadata.date
+        # Offline re-analysis rebuilds metadata from old JSON, so never clear a stored time.
+        game.started_at = metadata.started_at or game.started_at
         game.time_control = metadata.time_control
         game.link = metadata.link
         game.metadata_json = {
@@ -206,6 +209,7 @@ def load_analyses(
             black=game.black,
             result=game.result,
             date=game.played_at,
+            started_at=game.started_at,
             link=game.link,
             eco=game_payload.get("eco", ""),
             time_control=game.time_control,
@@ -286,11 +290,16 @@ def recompute_player_memory(session: Session, player_id: str) -> PlayerMemoryRow
         theme: round(sum(values) / len(values), 3) for theme, values in by_theme.items()
     }
     now = datetime.now(UTC)
-    schedules = session.scalars(
-        select(ReviewScheduleRow).where(ReviewScheduleRow.player_id == player_id)
+    schedules = session.execute(
+        select(ReviewScheduleRow, TrainingPlanRow.status)
+        .join(TrainingPositionRow, TrainingPositionRow.id == ReviewScheduleRow.position_id)
+        .join(TrainingPlanRow, TrainingPlanRow.id == TrainingPositionRow.plan_id)
+        .where(ReviewScheduleRow.player_id == player_id)
     ).all()
-    memory.due_positions = sum(_aware(item.due_at) <= now for item in schedules)
-    memory.mastered_positions = sum(item.consecutive_successes >= 3 for item in schedules)
+    memory.due_positions = sum(
+        _aware(item.due_at) <= now and status != LIBRARY_PLAN_STATUS for item, status in schedules
+    )
+    memory.mastered_positions = sum(item.consecutive_successes >= 3 for item, _ in schedules)
     session.flush()
     return memory
 

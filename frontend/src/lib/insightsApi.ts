@@ -51,6 +51,26 @@ export interface ColorRow {
   accuracy_games: number;
 }
 
+export interface ScheduleRow {
+  key: string;
+  label: string;
+  games: number;
+  /** Too few games to conclude anything: shown, but muted and never called out. */
+  low_sample: boolean;
+  score_pct: number | null;
+  score_low_pct: number | null;
+  score_high_pct: number | null;
+  accuracy: number | null;
+  accuracy_games: number;
+  blunders_per_game: number;
+}
+
+export interface ScheduleBreakdown {
+  rows: ScheduleRow[];
+  best: string | null;
+  worst: string | null;
+}
+
 export interface LeakAction {
   type: 'practice' | 'openings';
   theme: string | null;
@@ -108,15 +128,25 @@ export interface InsightsResponse {
     saves: number;
     save_pct: number | null;
   };
+  schedule: {
+    sample_size: number;
+    undated_games: number;
+    timezone: string;
+    by_time_of_day: ScheduleBreakdown;
+    by_day_of_week: ScheduleBreakdown;
+  };
 }
 
 export async function getInsights(
   username: string,
   platform: Platform | 'pgn',
-  last = 500
+  last = 500,
+  timezone?: string
 ): Promise<InsightsResponse> {
+  const params = new URLSearchParams({ last: String(last) });
+  if (timezone) params.set('tz', timezone);
   const response = await fetch(
-    `/api/insights/${encodeURIComponent(platform)}/${encodeURIComponent(username)}?last=${last}`
+    `/api/insights/${encodeURIComponent(platform)}/${encodeURIComponent(username)}?${params}`
   );
   if (!response.ok) throw new Error('Could not load insights');
   return response.json();

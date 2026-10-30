@@ -25,7 +25,15 @@ from sqlalchemy.orm import Session
 
 from .classification import game_accuracy
 from .db import session_scope
-from .db_models import CriticalMomentRow, GameRow, PlayerRow, ReviewScheduleRow, TrainingPositionRow
+from .db_models import (
+    LIBRARY_PLAN_STATUS,
+    CriticalMomentRow,
+    GameRow,
+    PlayerRow,
+    ReviewScheduleRow,
+    TrainingPlanRow,
+    TrainingPositionRow,
+)
 from .insights import time_category
 from .openings import classify_moves, opening_book
 from .repositories import normalize_username
@@ -557,7 +565,11 @@ def practice_queue(session: Session, platform: str, username: str) -> PracticeQu
     due_rows = session.execute(
         select(ReviewScheduleRow.due_at, TrainingPositionRow.theme)
         .join(TrainingPositionRow, TrainingPositionRow.id == ReviewScheduleRow.position_id)
-        .where(ReviewScheduleRow.player_id == player.id)
+        .join(TrainingPlanRow, TrainingPlanRow.id == TrainingPositionRow.plan_id)
+        .where(
+            ReviewScheduleRow.player_id == player.id,
+            TrainingPlanRow.status != LIBRARY_PLAN_STATUS,
+        )
     ).all()
     due_themes: Counter[str] = Counter()
     upcoming: list[datetime] = []

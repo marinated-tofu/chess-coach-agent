@@ -129,6 +129,9 @@ async def _process_sync_job(job_id: str, request: SyncGamesRequest) -> None:
                 existing = find_stored_game(
                     session, job.player_id, preview.game_id, preview.link
                 )
+                # Games stored before start times were kept get one from any sync, no re-analysis.
+                if existing is not None and existing.started_at is None:
+                    existing.started_at = preview.started_at
                 # Games re-analyzed offline lack the PGN-only fields (clocks, opponent rating,
                 # termination), so a sync analyzes them once more from the fetched PGN.
                 has_pgn_fields = existing is not None and "opponent_elo" in (

@@ -18,7 +18,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .db import session_scope
-from .db_models import GameRow, ReviewScheduleRow, SyncJobRow, TrainingPositionRow
+from .db_models import (
+    LIBRARY_PLAN_STATUS,
+    GameRow,
+    ReviewScheduleRow,
+    SyncJobRow,
+    TrainingPlanRow,
+    TrainingPositionRow,
+)
 from .insights import time_category
 from .library_api import player_index
 from .openings_api import _find_player
@@ -118,7 +125,11 @@ def _due(session: Session, player_id: str, now: datetime) -> DueSummary:
     rows = session.execute(
         select(ReviewScheduleRow.due_at, TrainingPositionRow.theme)
         .join(TrainingPositionRow, TrainingPositionRow.id == ReviewScheduleRow.position_id)
-        .where(ReviewScheduleRow.player_id == player_id)
+        .join(TrainingPlanRow, TrainingPlanRow.id == TrainingPositionRow.plan_id)
+        .where(
+            ReviewScheduleRow.player_id == player_id,
+            TrainingPlanRow.status != LIBRARY_PLAN_STATUS,
+        )
     ).all()
     due_themes: Counter[str] = Counter()
     upcoming: list[datetime] = []
