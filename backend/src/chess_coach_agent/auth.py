@@ -1,7 +1,7 @@
 """Signed cookies and PKCE helpers for the optional "Sign in with Lichess" flow.
 
-Only the Lichess username is ever stored (in a signed cookie). The OAuth access token is
-used once to read the account, then revoked.
+The session cookie holds only the signed user id. The OAuth access token is used once to
+read the account, then revoked.
 """
 
 from __future__ import annotations
@@ -72,6 +72,18 @@ def unsign(token: str | None, purpose: str, max_age: int) -> dict | None:
     if not isinstance(payload, dict) or time.time() - payload.get("iat", 0) > max_age:
         return None
     return payload
+
+
+def session_user_id(token: str | None) -> str | None:
+    session = unsign(token, "session", SESSION_MAX_AGE)
+    user_id = session.get("uid") if session else None
+    return user_id if isinstance(user_id, str) else None
+
+
+def chesscom_code(user_id: str, username: str) -> str:
+    """The code a user puts on their Chess.com profile. Derived, so nothing needs storing."""
+    digest = _signature("chesscom", f"{user_id}.{username.strip().lower()}")
+    return "coach-" + digest.replace("-", "").replace("_", "")[:12]
 
 
 def new_code_verifier() -> str:

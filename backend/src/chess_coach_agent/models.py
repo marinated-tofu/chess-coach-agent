@@ -368,3 +368,5 @@ class ProgressSummary(BaseModel):
     quiz_accuracy: dict[str, float]
     recent_attempts: int
     transfer_score: float | None = None
+    # True when the practice figures were left out because the viewer does not own this player.
+    private: bool = False

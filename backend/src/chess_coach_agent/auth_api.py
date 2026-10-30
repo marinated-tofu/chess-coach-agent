@@ -8,6 +8,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 
+from .accounts import Viewer, link_player, sign_in_user, signed_in_user, viewer_id
 from .auth import (
     LICHESS_HOST,
     OAUTH_COOKIE,
@@ -20,7 +21,10 @@ from .auth import (
     sign,
     unsign,
 )
+from .coach_limits import coach_quota, quota_scope
+from .db import session_scope
 from .importers import lichess_user_agent
+from .repositories import normalize_username
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -143,11 +147,21 @@ async def lichess_callback(
         username = await _exchange_code(code, pending["verifier"], pending["redirect_uri"])
     except httpx.HTTPError as exc:
         raise HTTPException(502, "Could not reach Lichess to finish sign-in.") from exc
+    with session_scope() as session:
+        user = sign_in_user(
+            session,
+            "lichess",
+            normalize_username(username),
+            username,
+            current_user_id=viewer_id(request),
+        )
+        link_player(session, user.id, "lichess", username, "lichess_oauth")
+        user_id = user.id
     response = RedirectResponse(target, status_code=302)
     response.delete_cookie(OAUTH_COOKIE, path="/api/auth")
     response.set_cookie(
         SESSION_COOKIE,
-        sign({"lichess_username": username}, "session"),
+        sign({"uid": user_id}, "session"),
         max_age=SESSION_MAX_AGE,
         httponly=True,
         secure=_secure(request),
@@ -157,15 +171,22 @@ async def lichess_callback(
     return response
 
 
-def current_lichess_username(request: Request) -> str | None:
-    session = unsign(request.cookies.get(SESSION_COOKIE), "session", SESSION_MAX_AGE)
-    return session.get("lichess_username") if session else None
-
-
 @router.get("/me")
-def me(request: Request) -> dict:
-    username = current_lichess_username(request)
-    return {"signed_in": bool(username), "lichess_username": username}
+def me(request: Request, user_id: Viewer) -> dict:
+    with session_scope() as session:
+        user = signed_in_user(session, user_id)
+        quota = coach_quota(session, quota_scope(session, request, user.id if user else None))
+    players = user.players if user else []
+    return {
+        "signed_in": user is not None,
+        "lichess_username": next(
+            (item["username"] for item in players if item["platform"] == "lichess"), None
+        ),
+        "display_name": user.display_name if user else None,
+        "plan": user.plan if user else None,
+        "players": players,
+        "coach_quota": quota.model_dump(mode="json"),
+    }
 
 
 @router.post("/logout")

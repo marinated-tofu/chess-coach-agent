@@ -24,6 +24,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .classification import game_accuracy
+from .accounts import Viewer, can_access
 from .db import session_scope
 from .db_models import CriticalMomentRow, GameRow, PlayerRow, ReviewScheduleRow, TrainingPositionRow
 from .insights import time_category
@@ -694,9 +695,13 @@ def get_library_progress(platform: str, username: str) -> LibraryProgress:
 
 
 @router.get("/{platform}/{username}/practice-queue", response_model=PracticeQueue)
-def get_practice_queue(platform: str, username: str) -> PracticeQueue:
+def get_practice_queue(platform: str, username: str, user_id: Viewer) -> PracticeQueue:
     with session_scope() as session:
-        return practice_queue(session, platform, username)
+        queue = practice_queue(session, platform, username)
+        if can_access(session, platform, username, user_id):
+            return queue
+        # The candidates come from public games; the review schedule is the player's own.
+        return queue.model_copy(update={"due_count": 0, "due_themes": [], "next_due_at": None})
 
 
 # Build indexes in the background so the first library request after a restart is fast.

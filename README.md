@@ -237,9 +237,11 @@ Copy `.env.example` to `.env` at the repo root. Every variable is optional.
 | `STOCKFISH_DEPTH` | `9` | Engine search depth |
 | `STOCKFISH_MAX_NODES` | `60000` | Node cap per analyzed position |
 | `LICHESS_API_TOKEN` | empty | Needed for the opening explorer; Lichess now rejects anonymous explorer requests. Create one at <https://lichess.org/account/oauth/token> with no scopes |
-| `SESSION_SECRET` | empty | Signs the Lichess sign-in cookie; set a long random value in production |
+| `SESSION_SECRET` | empty | Signs the session cookie and Chess.com link codes; set a long random value in production |
 | `LICHESS_CLIENT_ID` | `chess-coach-agent` | Name shown on the Lichess consent screen |
 | `PUBLIC_BASE_URL` | derived from the request | Origin used for the OAuth redirect URI |
+| `COACH_DAILY_LIMIT_ANONYMOUS`, `COACH_DAILY_LIMIT_FREE`, `COACH_DAILY_LIMIT_PAID` | `5`, `20`, `200` | Coach questions per UTC day. Anonymous visitors are counted per address |
+| `TRUSTED_PROXY_HOPS` | `0` | How many proxies in front of the app append to `X-Forwarded-For`. Set it behind a proxy, or all anonymous visitors share one limit |
 | `MONITORING_LOG_PATH` | `backend/data/logs/events.jsonl` | JSONL event log |
 | `ENABLE_LOCAL_EMBEDDINGS` | `false` | Compute FastEmbed vectors for vector/hybrid retrieval |
 | `RETRIEVAL_STRATEGY` | from benchmark (`bm25`) | Force `bm25` or `hybrid` |

@@ -26,11 +26,13 @@ from .bots_api import router as bots_router
 from .insights_api import router as insights_router
 from .vision_api import router as vision_router
 from .auth_api import router as auth_router
+from .account_api import router as account_router
 from .export_api import router as export_router
 from .explorer_api import router as explorer_router
 from .repertoire_api import router as repertoire_router
 from .today_api import router as today_router
 from .library_api import router as library_router
+from .accounts import Viewer, require_access
 from .db import init_db, session_scope
 from .repositories import persist_analyses
 
@@ -50,6 +52,7 @@ app.include_router(bots_router)
 app.include_router(insights_router)
 app.include_router(vision_router)
 app.include_router(auth_router)
+app.include_router(account_router)
 app.include_router(export_router)
 app.include_router(explorer_router)
 app.include_router(repertoire_router)
@@ -96,7 +99,10 @@ def sample() -> dict[str, str]:
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
-def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
+def analyze(request: AnalyzeRequest, user_id: Viewer) -> AnalyzeResponse:
+    # Pasted games go into the player's library, so a claimed player only takes them from its owner.
+    with session_scope() as session:
+        require_access(session, request.platform, request.player, user_id)
     log_event("analysis_requested", {"player": request.player, "max_games": request.max_games})
     started = time.perf_counter()
     response = agent.import_pgn_text(request.pgn, player=request.player, max_games=request.max_games)
@@ -119,7 +125,13 @@ def feedback(request: FeedbackRequest) -> dict[str, str]:
 
 @app.get("/api/monitoring")
 def monitoring() -> dict:
-    return monitoring_summary()
+    summary = monitoring_summary()
+    # This page is public; events carry coach questions and answers, feedback and usernames.
+    summary["recent_events"] = [
+        {key: event.get(key) for key in ("timestamp", "event_type")}
+        for event in summary["recent_events"]
+    ]
+    return summary
 
 
 frontend_value = os.getenv("FRONTEND_DIST", "")
