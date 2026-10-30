@@ -178,6 +178,7 @@ def get_catalog() -> PuzzleCatalog:
 def list_puzzles(
     user_id: Viewer,
     theme: str | None = None,
+    tag: str | None = Query(default=None, max_length=40),
     min_rating: int | None = Query(default=None, ge=0, le=4000),
     max_rating: int | None = Query(default=None, ge=0, le=4000),
     offset: int = Query(default=0, ge=0),
@@ -185,7 +186,7 @@ def list_puzzles(
     platform: str | None = None,
     username: str | None = None,
 ) -> PuzzlePage:
-    matches = filter_puzzles(theme, min_rating, max_rating)
+    matches = filter_puzzles(theme, min_rating, max_rating, tag=tag)
     page = matches[offset : offset + limit]
     statuses = _statuses(platform, username, [item.id for item in page], user_id)
     return PuzzlePage(

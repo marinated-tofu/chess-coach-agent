@@ -22,7 +22,8 @@ import {
   type Leak,
   type PhaseRow,
   type ScheduleBreakdown,
-  type ScheduleRow
+  type ScheduleRow,
+  type TacticRow
 } from '../lib/insightsApi';
 import { PageHeader } from '../components/PageHeader';
 import { useWorkspace } from '../workspace/WorkspaceContext';
@@ -436,6 +437,75 @@ function ConversionSection({ data }: { data: InsightsResponse }) {
   );
 }
 
+function TacticRowView({ row }: { row: TacticRow }) {
+  return (
+    <tr className={row.low_sample ? 'schedule-thin' : undefined}>
+      <th scope="row">{row.label}</th>
+      <td>{count(row.found)}</td>
+      <td>{count(row.missed)}</td>
+      <td>{row.low_sample ? '–' : fmt(row.found_pct, 0, '%')}</td>
+      <td>{row.low_sample ? '–' : `${fmt(row.found_low_pct, 0)}-${fmt(row.found_high_pct, 0, '%')}`}</td>
+      <td className="tactic-misses">
+        {row.examples.length === 0 && '–'}
+        {row.examples.map((example) => (
+          <Link
+            key={`${example.game_id}-${example.ply}`}
+            to="/analysis"
+            search={{ fen: example.fen, from: `game:${example.game_id}:${example.ply}` }}
+            title={`You played ${example.played_san}. The engine's move was ${example.best_san}.`}
+          >
+            {example.best_san}
+          </Link>
+        ))}
+      </td>
+      <td>
+        {row.missed > 0 ? (
+          <Link className="tactic-practice" to="/puzzles" search={{ tag: row.practice_tag }}>
+            Puzzles <ArrowRight size={14} />
+          </Link>
+        ) : '–'}
+      </td>
+    </tr>
+  );
+}
+
+function TacticsSection({ data }: { data: InsightsResponse }) {
+  const { tactics } = data;
+  const rows = tactics.rows.filter((row) => row.chances > 0);
+  const total = tactics.found + tactics.missed;
+  return (
+    <section className="insights-section">
+      <SectionHead title="Tactics found and missed" n={tactics.sample_size} unit="games with engine data" />
+      {total === 0 ? (
+        <p className="insights-summary">No clear tactical chances in these games yet.</p>
+      ) : (
+        <>
+          <p className="insights-summary">
+            You found {count(tactics.found)} of {count(total)} tactical chances.
+          </p>
+          <div className="tactic-table">
+            <table className="insights-table wide">
+              <thead>
+                <tr><th>Motif</th><th>Found</th><th>Missed</th><th>Found rate</th><th>Likely range</th><th>Latest misses</th><th>Practice</th></tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => <TacticRowView key={row.motif} row={row} />)}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <p className="insights-footnote">
+        A chance counts only when the engine's move sets up the motif and wins at least 1.5 pawns of material
+        against every reply, or forces mate within 5 moves. Other winning ideas aren't counted, so this is a floor, not
+        every tactic you had. A different move that kept the advantage counts as neither found nor missed.
+        {' '}Rates need {tactics.min_chances} chances; grey rows have fewer. Likely range is the 95% interval.
+        {tactics.games_without_evals > 0 && ` ${count(tactics.games_without_evals)} of ${count(tactics.sample_size + tactics.games_without_evals)} games have no stored engine moves and are left out; a full re-sync adds them.`}
+      </p>
+    </section>
+  );
+}
+
 const PERF_LABEL: Record<string, string> = {
   ultraBullet: 'UltraBullet',
   bullet: 'Bullet',
@@ -558,6 +628,7 @@ export function InsightsPage() {
     if (data.time.sample_size < min) missing.push('Time-pressure stats need clock times.');
     if (data.conversion.sample_size < min) missing.push('Winning and losing positions need move-by-move engine data.');
     if (data.opponents.sample_size < min) missing.push("Opponent-rating stats need opponent ratings, which aren't saved with games yet.");
+    if (data.tactics.sample_size < min) missing.push('Tactics found and missed need stored engine moves.');
     if (data.schedule.sample_size < min) missing.push('Time-of-day stats need game start times, which older imports did not save.');
   }
 
@@ -616,6 +687,7 @@ export function InsightsPage() {
             )}
           </section>
           <PhaseSection data={data} />
+          {data.tactics.sample_size >= min && <TacticsSection data={data} />}
           <TimeSection data={data} />
           {data.schedule.sample_size >= min && <ScheduleSection data={data} />}
           {data.opponents.sample_size >= min && <OpponentSection data={data} />}

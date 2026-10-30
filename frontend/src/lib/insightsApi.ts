@@ -86,6 +86,40 @@ export interface Leak {
   action: LeakAction;
 }
 
+export interface TacticExample {
+  game_id: string;
+  ply: number;
+  move_number: number;
+  color: 'white' | 'black';
+  played_san: string;
+  best_san: string;
+  fen: string;
+}
+
+export interface TacticRow {
+  motif: string;
+  label: string;
+  found: number;
+  missed: number;
+  chances: number;
+  /** Too few chances for a rate: counts only. */
+  low_sample: boolean;
+  found_pct: number | null;
+  found_low_pct: number | null;
+  found_high_pct: number | null;
+  practice_tag: string;
+  examples: TacticExample[];
+}
+
+export interface TacticsSection {
+  sample_size: number;
+  games_without_evals: number;
+  min_chances: number;
+  found: number;
+  missed: number;
+  rows: TacticRow[];
+}
+
 export interface InsightsResponse {
   platform: string;
   username: string;
@@ -135,6 +169,7 @@ export interface InsightsResponse {
     by_time_of_day: ScheduleBreakdown;
     by_day_of_week: ScheduleBreakdown;
   };
+  tactics: TacticsSection;
 }
 
 export interface RatingPercentile {
