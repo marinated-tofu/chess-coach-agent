@@ -114,6 +114,7 @@ export function ProgressPage() {
         title="Progress"
         detail={`Game trends and practice results for ${workspace.player}.`}
       />
+      {data?.private && <p className="route-status">This player's practice figures are private. Games and ratings stay public.</p>}
       <div className="progress-metrics">
         <div><Activity size={18} /><strong>{totalGames == null ? '–' : totalGames.toLocaleString()}</strong><span>Games analyzed</span></div>
         <div><Target size={18} /><strong>{(data?.recent_attempts ?? 0).toLocaleString()}</strong><span>Practice attempts</span></div>

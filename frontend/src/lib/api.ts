@@ -10,7 +10,7 @@ import type {
   SyncJob
 } from './types';
 
-async function errorMessage(response: Response, fallback: string): Promise<string> {
+export async function errorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const body = await response.json();
     if (typeof body?.detail === 'string' && body.detail) return body.detail;
@@ -83,13 +83,13 @@ export async function createTrainingSession(
       position_count: momentId ? 1 : 5
     })
   });
-  if (!response.ok) throw new Error('Could not build training session');
+  if (!response.ok) throw new Error(await errorMessage(response, 'Could not build training session'));
   return response.json();
 }
 
 export async function getTrainingSession(sessionId: string): Promise<TrainingSession> {
   const response = await fetch(`/api/training/sessions/${sessionId}`);
-  if (!response.ok) throw new Error('Could not load training session');
+  if (!response.ok) throw new Error(await errorMessage(response, 'Could not load training session'));
   return response.json();
 }
 
@@ -104,7 +104,7 @@ export async function submitTrainingAttempt(
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ position_id: positionId, move, hints_used: hintsUsed, elapsed_ms: elapsedMs })
   });
-  if (!response.ok) throw new Error('Could not evaluate move');
+  if (!response.ok) throw new Error(await errorMessage(response, 'Could not evaluate move'));
   return response.json();
 }
 
@@ -165,6 +165,7 @@ export async function askCoach(request: {
       message_history: request.messageHistory
     })
   });
-  if (!response.ok) throw new Error('The coach could not answer. Try again.');
+  // Also carries the daily limit message from a 429.
+  if (!response.ok) throw new Error(await errorMessage(response, 'The coach could not answer. Try again.'));
   return response.json();
 }

@@ -17,6 +17,7 @@ import { AnalysisBoardPage } from './pages/AnalysisBoardPage';
 import { SetupPositionPage } from './pages/SetupPositionPage';
 import { PlayPage } from './pages/PlayPage';
 import { RepertoirePage } from './pages/RepertoirePage';
+import { AccountPage } from './pages/AccountPage';
 import { PageHeader } from './components/PageHeader';
 import { AppNav } from './components/AppNav';
 import { SyncToast } from './components/SyncToast';
@@ -131,9 +132,11 @@ const qualityRoute = createRoute({ getParentRoute: () => rootRoute, path: '/qual
 
 const repertoireRoute = createRoute({ getParentRoute: () => rootRoute, path: '/repertoire', component: RepertoirePage });
 const setupRoute = createRoute({ getParentRoute: () => rootRoute, path: '/setup', component: SetupPositionPage });
+const accountRoute = createRoute({ getParentRoute: () => rootRoute, path: '/account', component: AccountPage });
 const routeTree = rootRoute.addChildren([
   setupRoute,
   repertoireRoute,
+  accountRoute,
   indexRoute, analyzeRoute, gamesRoute, gameRoute, practiceRoute, practiceSessionRoute,
   retiredCoachRoute, retiredCoachSessionRoute, progressRoute, insightsRoute, qualityRoute, analysisRoute, playRoute
 ]);

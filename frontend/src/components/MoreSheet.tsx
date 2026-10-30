@@ -95,7 +95,7 @@ export function MoreSheet({ open, onClose, groups, badges, returnFocus }: {
           })}
         </nav>
         <div className="sidebar-footer">
-          <AccountButton />
+          <AccountButton onNavigate={onClose} />
           <Link to="/quality" className="nav-dev-link" activeProps={{ className: 'active' }} onClick={onClose}>
             Developer: quality
           </Link>

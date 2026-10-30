@@ -65,6 +65,9 @@ export function DueCard({ summary, primary }: { summary: UseQueryResult<TodaySum
       <CardState query={summary} label="due reviews">
         {() => {
           const due = summary.data!.due;
+          if (summary.data!.private) {
+            return <p className="today-card-body">This player's reviews are private.</p>;
+          }
           if (!due.count) {
             return (
               <p className="today-card-body">
