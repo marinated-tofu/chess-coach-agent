@@ -264,6 +264,9 @@ function TimeSection({ data }: { data: InsightsResponse }) {
           <SampleNote n={time.sample_size} unit="games with clock data" />
         </div>
       )}
+      <Link className="insights-time-link" to="/practice" search={{ mode: 'time' }}>
+        Train your time use on positions from your games <ArrowRight size={15} />
+      </Link>
     </section>
   );
 }

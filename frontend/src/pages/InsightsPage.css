@@ -266,6 +266,16 @@
 .insights-table tbody th { font-weight: 600; }
 .insights-table tbody tr:last-child > * { border-bottom: 0; }
 
+.insights-time-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--green-600);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .insights-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

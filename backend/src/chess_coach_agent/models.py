@@ -302,6 +302,25 @@ class QuizPanel(BaseModel):
     hint: str | None = None
 
 
+class TimeTrainerResult(BaseModel):
+    kind: Literal["rushed", "burned"]
+    budget_seconds: int
+    original_seconds: float
+    typical_seconds: float
+    played_san: str
+    played_verdict: str
+    played_win_pct_loss: float
+    attempt_seconds: float
+    timed_out: bool = False
+    verdict: Literal[
+        "best", "good", "inaccuracy", "mistake", "blunder", "timed_out", "unavailable"
+    ]
+    win_pct_loss: float | None = None
+    move_number: int = 0
+    opponent: str = ""
+    played_at: str = ""
+
+
 class EvaluationPanel(BaseModel):
     type: Literal["evaluation"] = "evaluation"
     position_id: str
@@ -313,6 +332,7 @@ class EvaluationPanel(BaseModel):
     cp_loss: float | None = None
     explanation: str
     next_review_at: datetime
+    time_result: TimeTrainerResult | None = None
 
 
 CoachPanel = Annotated[
@@ -329,7 +349,8 @@ class TrainingSessionCreate(BaseModel):
     position_count: int = Field(default=5, ge=1, le=10)
     # "mixed": own-game positions first, topped up with library puzzles when short.
     # "puzzles": only library puzzles for the theme (or the player's top weakness).
-    mode: Literal["mixed", "puzzles"] = "mixed"
+    # "time": timed positions from the player's own games, chosen from their clock data.
+    mode: Literal["mixed", "puzzles", "time"] = "mixed"
 
 
 class TrainingPositionView(BaseModel):
@@ -343,6 +364,9 @@ class TrainingPositionView(BaseModel):
     hint: str | None = None
     source: Literal["game", "puzzle"] = "game"
     rating: int | None = None
+    # Time trainer countdown. The rest of the timing stays server-side until the attempt,
+    # since the kind of position and the original move would give the answer away.
+    time_budget_seconds: int | None = None
 
 
 class TrainingSessionView(BaseModel):
@@ -359,6 +383,7 @@ class QuizAttemptCreate(BaseModel):
     move: str
     hints_used: int = Field(default=0, ge=0, le=5)
     elapsed_ms: int = Field(default=0, ge=0)
+    timed_out: bool = False  # time trainer: the countdown hit zero, so ``move`` is empty
 
 
 class ProgressSummary(BaseModel):

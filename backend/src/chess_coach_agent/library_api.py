@@ -37,6 +37,7 @@ from .db_models import (
 from .insights import time_category
 from .openings import classify_moves, opening_book
 from .repositories import normalize_username
+from .time_trainer import TimeTrainerStatus, time_trainer_status
 
 router = APIRouter(prefix="/api/library")
 
@@ -703,6 +704,14 @@ def get_library(
 def get_library_progress(platform: str, username: str) -> LibraryProgress:
     with session_scope() as session:
         return library_progress(session, platform, username)
+
+
+@router.get("/{platform}/{username}/time-trainer", response_model=TimeTrainerStatus)
+def get_time_trainer_status(platform: str, username: str) -> TimeTrainerStatus:
+    with session_scope() as session:
+        return time_trainer_status(
+            session, platform, username, _find_player(session, platform, username)
+        )
 
 
 @router.get("/{platform}/{username}/practice-queue", response_model=PracticeQueue)

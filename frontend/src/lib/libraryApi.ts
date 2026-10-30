@@ -130,6 +130,19 @@ export async function getPracticeQueue(username: string, platform: Platform): Pr
   return response.json();
 }
 
+export interface TimeTrainerStatus {
+  status: 'ready' | 'no_clock_data' | 'no_candidates';
+  clock_games: number;
+  rushed_count: number;
+  burned_count: number;
+}
+
+export async function getTimeTrainerStatus(username: string, platform: Platform): Promise<TimeTrainerStatus> {
+  const response = await fetch(`/api/library/${platform}/${encodeURIComponent(username.trim())}/time-trainer`);
+  if (!response.ok) throw new Error('Could not load your clock data');
+  return response.json();
+}
+
 const dayFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const monthFormat = new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' });
 

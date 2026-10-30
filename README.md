@@ -76,6 +76,9 @@ Training:
 - Insights by time of day and weekday, with sample sizes and likely ranges shown.
 - Practice sessions built from the player's own mistakes, mixed with rated Lichess puzzles on the
   same themes, graded with Stockfish and scheduled with spaced repetition.
+- Time trainer: a timed practice mode built from the player's clock data. It serves positions
+  where they rushed a critical move or spent too long on a simple one, then compares both clock
+  times and Stockfish's verdict.
 - Opening repertoire builder with a spaced-repetition drill for each line.
 - Endgame trainer: play out essential positions and endgames you let slip against Stockfish.
 - Eight bots from 600 to 2200 with different styles. They pick moves from Stockfish's candidate
@@ -377,7 +380,7 @@ The React app (TanStack Router and Query) has these pages:
 | `/` | Dashboard: rating, weaknesses, due positions, continue training |
 | `/games` | Game library and full-history sync |
 | `/games/:gameId?moment=:id` | Game review: board with square-control heatmap, move list, critical moments, feedback buttons, Coach panel |
-| `/practice`, `/practice/:sessionId` | Board drills and puzzles graded by Stockfish, with a Coach panel for hints |
+| `/practice`, `/practice/:sessionId` | Board drills and puzzles graded by Stockfish, with a Coach panel for hints. `/practice?mode=time` opens the time trainer |
 | `/progress` | Rating, results, theme accuracy, mastery charts |
 | `/insights` | Where points are lost: themes, phases, colors, openings |
 | `/analysis?fen=` | Analysis board with engine lines, opening explorer and the coach |

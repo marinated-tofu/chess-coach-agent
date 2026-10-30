@@ -334,6 +334,7 @@ def training_session_view(session: Session, plan_id: str) -> TrainingSessionView
                 difficulty=item.difficulty,  # type: ignore[arg-type]
                 source="puzzle" if item.source == "puzzle" else "game",
                 rating=item.rating,
+                time_budget_seconds=(item.timing or {}).get("budget_seconds"),
                 prompt=item.prompt or "What would you play in this position?",
                 hint=item.hint,
             )

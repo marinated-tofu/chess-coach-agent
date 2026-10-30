@@ -27,6 +27,7 @@ MATE_CP = 100000
 class EngineLine:
     best_move: chess.Move | None
     score_cp: int | None
+    engine_backed: bool = True  # False when the score came from the material heuristic
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ class PositionEval:
     """Engine view of one position: the best line first, then the runner-up (MultiPV 2)."""
 
     lines: tuple[LineScore, ...]
+    heuristic: bool = False  # True when Stockfish was unavailable and this is the fallback
 
     @property
     def best(self) -> LineScore:
@@ -116,7 +118,11 @@ class EngineAnalyzer:
 
     def analyse(self, board: chess.Board, pov: bool) -> EngineLine:
         if not self.engine_path:
-            return EngineLine(best_move=_fallback_best_move(board), score_cp=simple_position_score(board, pov))
+            return EngineLine(
+                best_move=_fallback_best_move(board),
+                score_cp=simple_position_score(board, pov),
+                engine_backed=False,
+            )
         try:
             if self._engine is None:
                 self._engine = chess.engine.SimpleEngine.popen_uci(self.engine_path)
@@ -126,7 +132,11 @@ class EngineAnalyzer:
             return EngineLine(best_move=pv[0] if pv else None, score_cp=score)
         except Exception:
             self.close()
-            return EngineLine(best_move=_fallback_best_move(board), score_cp=simple_position_score(board, pov))
+            return EngineLine(
+                best_move=_fallback_best_move(board),
+                score_cp=simple_position_score(board, pov),
+                engine_backed=False,
+            )
 
     def evaluate(self, board: chess.Board, multipv: int = 2) -> PositionEval:
         """Score a position from White's point of view with up to ``multipv`` lines.
@@ -155,7 +165,9 @@ class EngineAnalyzer:
             except Exception:
                 self.close()
         cp = simple_position_score(board, chess.WHITE)
-        return PositionEval(lines=(LineScore(move=_fallback_best_move(board), value=cp, cp=cp),))
+        return PositionEval(
+            lines=(LineScore(move=_fallback_best_move(board), value=cp, cp=cp),), heuristic=True
+        )
 
 
 def _fallback_best_move(board: chess.Board) -> chess.Move | None:
