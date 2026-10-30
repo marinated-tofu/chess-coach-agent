@@ -177,8 +177,16 @@ export async function syncPlayerAccount(
   return games.json();
 }
 
-export async function clearBrowserWorkspace(page: import('@playwright/test').Page) {
+/** Starts the page with no selected player. The app keeps that choice in localStorage. */
+export async function clearBrowserWorkspace(page: Page) {
   await page.addInitScript(() => {
-    sessionStorage.removeItem('chess-coach-workspace');
+    localStorage.removeItem('chess-coach-player');
   });
+}
+
+/** Opens the app with this player already selected. */
+export async function selectPlayer(page: Page, player: string, platform: 'chess.com' | 'lichess' = 'chess.com') {
+  await page.addInitScript(([name, source]) => {
+    localStorage.setItem('chess-coach-player', JSON.stringify({ player: name, platform: source }));
+  }, [player, platform] as const);
 }

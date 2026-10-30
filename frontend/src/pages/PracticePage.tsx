@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { ArrowRight, CheckCircle2, FlipVertical2, Home, Loader2, RotateCcw, Target, Timer } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle2, FlipVertical2, Home, Loader2, RotateCcw, Target, Timer } from 'lucide-react';
 import { ARROW_COLORS, ChessBoard, type BoardArrow } from '../components/ChessBoard';
 import { CoachPanel } from '../components/CoachPanel';
 import { EmptyState } from '../components/EmptyState';
@@ -21,6 +21,8 @@ import { useCoachMarks } from '../lib/coachMarks';
 import type { EvaluationPanel } from '../lib/types';
 import { useWorkspace } from '../workspace/WorkspaceContext';
 import './PracticePage.css';
+import { isAccessDenied } from '../lib/access';
+import { PrivatePlayerNotice } from '../components/PrivatePlayerNotice';
 
 function QueuePanel({ queue, busy, onStart, onPuzzles }: {
   queue: PracticeQueue | undefined;
@@ -147,10 +149,13 @@ export function PracticePage({ sessionId, mode }: { sessionId?: string; mode?: '
 
   async function start() {
     setBusy(true);
+    setAttemptError('');
     try {
       // Serves due reviews first; the server falls back to a mixed session when none are due.
       const created = await createTrainingSession(workspace.player, workspace.platform, undefined, undefined, 'due');
       await navigate({ to: '/practice/$sessionId', params: { sessionId: created.id } });
+    } catch (error) {
+      setAttemptError(error instanceof Error ? error.message : 'Could not start practice');
     } finally {
       setBusy(false);
     }
@@ -256,6 +261,7 @@ export function PracticePage({ sessionId, mode }: { sessionId?: string; mode?: '
       onStart={start}
       onPuzzles={(id) => void navigate({ to: '/practice/$sessionId', params: { sessionId: id } })}
     />
+    {attemptError && <p className="route-status error" role="alert">{attemptError}</p>}
     {queue.isError && <p className="route-status error" role="alert">Your practice queue didn’t load. You can still start a session.</p>}
   </main>;
 
@@ -264,6 +270,15 @@ export function PracticePage({ sessionId, mode }: { sessionId?: string; mode?: '
       <div className="practice-board"><Skeleton variant="board" label="Loading positions" /></div>
       <div className="practice-controls"><Skeleton lines={4} /></div>
     </section>
+  </main>;
+  if (isAccessDenied(training.error)) return <main className="route-page"><PrivatePlayerNotice error={training.error} /></main>;
+  if (training.isError) return <main className="route-page">
+    <EmptyState
+      icon={<AlertCircle size={22} />}
+      title="This session didn’t load"
+      body={training.error.message}
+      action={<button className="primary" onClick={() => navigate({ to: '/practice' })}>Back to practice</button>}
+    />
   </main>;
   if (!position) return <main className="route-page">
     <EmptyState

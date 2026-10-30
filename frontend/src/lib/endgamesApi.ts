@@ -1,4 +1,5 @@
 /** Endgame trainer (backend: endgames_api.py, judging rules in endgames.py). */
+import { isDeniedStatus } from './access';
 import type { Platform } from './types';
 
 export type EndgameDrill = {
@@ -59,11 +60,20 @@ async function readError(response: Response, fallback: string): Promise<Error> {
   return new Error(typeof detail?.detail === 'string' ? detail.detail : `${fallback} (${response.status})`);
 }
 
-export async function getEndgameDrills(username: string, platform: Platform): Promise<EndgameDrill[]> {
+export type EndgameDrills = {
+  drills: EndgameDrill[];
+  /** The current player is private: these are the essentials only, and results are not saved. */
+  private: boolean;
+};
+
+export async function getEndgameDrills(username: string, platform: Platform): Promise<EndgameDrills> {
   const params = username.trim() ? `?${new URLSearchParams({ platform, username: username.trim() })}` : '';
-  const response = await fetch(`/api/endgames${params}`);
+  let response = await fetch(`/api/endgames${params}`);
+  const denied = isDeniedStatus(response.status);
+  // The essential positions are public; only this player's drills and results are not.
+  if (denied) response = await fetch('/api/endgames');
   if (!response.ok) throw await readError(response, 'Could not load endgames');
-  return ((await response.json()) as { drills: EndgameDrill[] }).drills;
+  return { ...((await response.json()) as { drills: EndgameDrill[] }), private: denied };
 }
 
 export async function takeEndgameTurn(body: EndgameTurnRequest): Promise<EndgameTurn> {

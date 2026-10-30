@@ -1,3 +1,4 @@
+import { throwIfDenied } from './access';
 import type { Platform } from './types';
 
 export type RepertoireColor = 'white' | 'black';
@@ -77,6 +78,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: init?.body ? { 'Content-Type': 'application/json' } : undefined
   });
+  await throwIfDenied(response);
   if (!response.ok) {
     let detail = `Request failed (${response.status})`;
     try {

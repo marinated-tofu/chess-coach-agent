@@ -102,7 +102,7 @@ def generate_quiz_copy_with_llm(
     difficulty: str,
 ) -> tuple[str, str | None, bool]:
     theme_label = _theme_label(theme)
-    fallback_prompt = f"You had a {theme_label} pattern in your game — what would you play?"
+    fallback_prompt = f"{theme_label.capitalize()} pattern in your game — what would you play?"
     fallback_hint = (
         f"Start with checks and captures. Theme: {theme_label}."
         if difficulty == "beginner"

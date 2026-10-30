@@ -36,7 +36,8 @@ function drillStatus(drill: EndgameDrill) {
   return null;
 }
 
-function reviewNote(turn: EndgameTurn) {
+function reviewNote(turn: EndgameTurn, privatePlayer: boolean) {
+  if (privatePlayer) return "This player's practice is private, so this result isn't saved.";
   if (!turn.recorded) return 'Set a player on the Games page to save results and schedule reviews.';
   const days = turn.interval_days ?? 1;
   return `Next review in ${days} ${days === 1 ? 'day' : 'days'}.`;
@@ -57,7 +58,8 @@ export function EndgamesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [run, setRun] = useState<{ id: number; drill: EndgameDrill } | null>(null);
 
-  const list = drills.data ?? [];
+  const list = drills.data?.drills ?? [];
+  const privatePlayer = Boolean(drills.data?.private);
   const selected = list.find((drill) => drill.id === selectedId) ?? list.find((drill) => drill.due) ?? list[0] ?? null;
   const dueCount = list.filter((drill) => drill.due).length;
   const gameCount = list.filter((drill) => drill.kind === 'game').length;
@@ -74,6 +76,7 @@ export function EndgamesPage() {
       <DrillScreen
         key={run.id}
         drill={run.drill}
+        privatePlayer={privatePlayer}
         onRetry={() => start(run.drill)}
         onNext={next ? () => start(next) : null}
         onExit={() => setRun(null)}
@@ -126,7 +129,9 @@ export function EndgamesPage() {
             ))}
             {drills.isSuccess && !gameCount && (
               <p className="endgames-note">
-                {player.trim()
+                {privatePlayer
+                  ? "This player's own endgames and results are private. The essentials are open to everyone."
+                  : player.trim()
                   ? 'No thrown endgames in your analyzed games yet. Lost wins and lost draws appear here after a sync.'
                   : <>Set a player on the <Link to="/games" search={{ import: true }}>Games</Link> page to add endgames you let slip and save your results.</>}
               </p>
@@ -165,8 +170,10 @@ export function EndgamesPage() {
   );
 }
 
-function DrillScreen({ drill, onRetry, onNext, onExit }: {
+function DrillScreen({ drill, privatePlayer, onRetry, onNext, onExit }: {
   drill: EndgameDrill;
+  /** The current player belongs to someone else, so results are not sent for them. */
+  privatePlayer: boolean;
   onRetry: () => void;
   onNext: (() => void) | null;
   onExit: () => void;
@@ -210,7 +217,7 @@ function DrillScreen({ drill, onRetry, onNext, onExit }: {
         resign,
         hints_used: hintOpen ? 1 : 0,
         elapsed_ms: Date.now() - startedAt.current,
-        ...(player.trim() ? { platform, username: player.trim() } : {})
+        ...(player.trim() && !privatePlayer ? { platform, username: player.trim() } : {})
       });
       setStrikes(turn.strikes);
       if (turn.reply_uci && turn.reply_san) {
@@ -288,7 +295,7 @@ function DrillScreen({ drill, onRetry, onNext, onExit }: {
                   {passed ? 'Passed' : 'Not this time'}
                 </strong>
                 <span>{finished.reason}</span>
-                <span>{reviewNote(finished)}</span>
+                <span>{reviewNote(finished, privatePlayer)}</span>
               </div>
               <div className="play-result-actions">
                 {onNext && (

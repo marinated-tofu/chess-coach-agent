@@ -50,8 +50,15 @@ export function parsePuzzleSearch(search: Record<string, unknown>): PuzzleSearch
 
 type Status = 'playing' | 'checking' | 'reply' | 'wrong' | 'solved' | 'revealed';
 
-function Solver({ puzzle, onNext, hasNext }: { puzzle: PuzzleSummary; onNext: () => void; hasNext: boolean }) {
+function Solver({ puzzle, onNext, hasNext, privatePlayer }: {
+  puzzle: PuzzleSummary;
+  onNext: () => void;
+  hasNext: boolean;
+  /** The current player belongs to someone else, so results are not sent for them. */
+  privatePlayer: boolean;
+}) {
   const { player, platform } = useWorkspace();
+  const recordFor = privatePlayer ? '' : player.trim();
   const queryClient = useQueryClient();
   const side = sideToMove(puzzle.fen);
   const [fen, setFen] = useState(puzzle.fen);
@@ -70,8 +77,8 @@ function Solver({ puzzle, onNext, hasNext }: { puzzle: PuzzleSummary; onNext: ()
 
   function playerFields() {
     return {
-      username: player.trim() || undefined,
-      platform: player.trim() ? platform : undefined,
+      username: recordFor || undefined,
+      platform: recordFor ? platform : undefined,
       record: !counted.current,
       elapsed_ms: Date.now() - startedAt.current
     };
@@ -211,7 +218,9 @@ function Solver({ puzzle, onNext, hasNext }: { puzzle: PuzzleSummary; onNext: ()
             {finish.tags.length > 0 && <span>Ideas: {finish.tags.join(', ').replace(/([A-Z0-9])/g, ' $1').toLowerCase()}. </span>}
             {finish.recorded && finish.next_review_at
               ? `Counted toward your mastery. Next review ${formatGameDate(finish.next_review_at)}.`
-              : player.trim() ? 'Only your first try counts toward mastery.' : 'Connect an account to count puzzles toward mastery.'}
+              : privatePlayer
+                ? "This player's practice is private, so this result isn't saved."
+                : player.trim() ? 'Only your first try counts toward mastery.' : 'Connect an account to count puzzles toward mastery.'}
           </p>
         )}
         <div className="puzzle-actions">
@@ -350,7 +359,7 @@ export function PuzzlesPage({ search }: { search: PuzzleSearch }) {
         />
       )}
       {!list.isError && total > 0 && current ? (
-        <Solver key={current.id} puzzle={current} onNext={next} hasNext={hasNext} />
+        <Solver key={current.id} puzzle={current} onNext={next} hasNext={hasNext} privatePlayer={Boolean(list.data?.private)} />
       ) : !list.isError && !(list.data && total === 0) && (
         <section className="practice-workspace practice-loading">
           <div className="practice-board"><Skeleton variant="board" label="Loading puzzle" /></div>

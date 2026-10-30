@@ -93,12 +93,16 @@ export function ProgressPage() {
   );
   const blindspots = library.data?.blindspots ?? [];
   const [practicing, setPracticing] = useState('');
+  const [practiceError, setPracticeError] = useState('');
 
   async function practiceTheme(theme: string) {
     setPracticing(theme);
+    setPracticeError('');
     try {
       const session = await createTrainingSession(workspace.player, workspace.platform, theme);
       await navigate({ to: '/practice/$sessionId', params: { sessionId: session.id } });
+    } catch (error) {
+      setPracticeError(error instanceof Error ? error.message : 'Could not start practice');
     } finally {
       setPracticing('');
     }
@@ -115,6 +119,7 @@ export function ProgressPage() {
         detail={`Game trends and practice results for ${workspace.player}.`}
       />
       {data?.private && <p className="route-status">This player's practice figures are private. Games and ratings stay public.</p>}
+      {practiceError && <p className="route-status error" role="alert">{practiceError}</p>}
       <div className="progress-metrics">
         <div><Activity size={18} /><strong>{totalGames == null ? '–' : totalGames.toLocaleString()}</strong><span>Games analyzed</span></div>
         <div><Target size={18} /><strong>{(data?.recent_attempts ?? 0).toLocaleString()}</strong><span>Practice attempts</span></div>
