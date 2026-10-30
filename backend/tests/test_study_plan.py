@@ -470,13 +470,13 @@ def _fake_llm(monkeypatch, reply: str, used: bool = True) -> None:
 
 def test_write_rationale_rejects_ungrounded_or_broken_output(monkeypatch):
     _fake_llm(monkeypatch, '{"rationale": "Tactics cost you 2.5 points per 10 games."}')
-    assert asyncio.run(study_plan.write_rationale(FACTS)).startswith("Tactics")
+    assert asyncio.run(study_plan.write_rationale(FACTS))[0].startswith("Tactics")
     _fake_llm(monkeypatch, '{"rationale": "Tactics cost you 9.9 points."}')
-    assert asyncio.run(study_plan.write_rationale(FACTS)) is None
+    assert asyncio.run(study_plan.write_rationale(FACTS))[0] is None
     _fake_llm(monkeypatch, "no json here")
-    assert asyncio.run(study_plan.write_rationale(FACTS)) is None
+    assert asyncio.run(study_plan.write_rationale(FACTS))[0] is None
     _fake_llm(monkeypatch, "", used=False)
-    assert asyncio.run(study_plan.write_rationale(FACTS)) is None
+    assert asyncio.run(study_plan.write_rationale(FACTS))[0] is None
 
 
 def test_post_stores_a_verified_rationale_only_with_a_key(monkeypatch):

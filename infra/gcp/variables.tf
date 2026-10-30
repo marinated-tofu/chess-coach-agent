@@ -73,3 +73,21 @@ variable "openrouter_model" {
   type        = string
   default     = "anthropic/claude-haiku-5.5"
 }
+
+variable "enable_uptime_check" {
+  description = "Probe /api/health/ready from three regions. The probes keep an instance running, which ends scale to zero: see the README before turning this on with a low budget."
+  type        = bool
+  default     = false
+}
+
+variable "uptime_check_period" {
+  description = "How often each region probes. One of 60s, 300s, 600s or 900s."
+  type        = string
+  default     = "900s"
+}
+
+variable "server_error_alert_per_minute" {
+  description = "Alert when 5xx responses average more than this many per minute over 5 minutes."
+  type        = number
+  default     = 1
+}

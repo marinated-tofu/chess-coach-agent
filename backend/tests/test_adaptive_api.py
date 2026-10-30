@@ -1,3 +1,4 @@
+import time
 from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
@@ -123,9 +124,7 @@ def test_full_history_sync_deduplicates_analyzed_games(monkeypatch):
             json={"platform": "chess.com", "username": "kfctofu", "max_games": 5000},
         )
         assert started.status_code == 200
-        job = client.get(f"/api/games/sync/{started.json()['id']}")
-        assert job.status_code == 200
-        payload = job.json()
+        payload = _finished_job(client, started.json()["id"])
         assert payload["status"] == "complete"
         assert payload["total_games"] == 1
         assert payload["analyzed_games"] == 0
@@ -140,15 +139,25 @@ def _sample_games(client: TestClient, count: int) -> list[str]:
     ]
 
 
+def _finished_job(client: TestClient, job_id: str) -> dict:
+    """Poll as the frontend does, while the worker started with the app runs the job."""
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        job = client.get(f"/api/games/sync/{job_id}")
+        assert job.status_code == 200
+        if job.json()["status"] in {"complete", "failed"}:
+            return job.json()
+        time.sleep(0.02)
+    raise AssertionError(f"Sync job did not finish: {job.json()}")
+
+
 def _run_sync(client: TestClient, username: str, platform: str = "chess.com") -> dict:
     started = client.post(
         "/api/games/sync",
         json={"platform": platform, "username": username, "max_games": 50},
     )
     assert started.status_code == 200
-    job = client.get(f"/api/games/sync/{started.json()['id']}")
-    assert job.status_code == 200
-    return job.json()
+    return _finished_job(client, started.json()["id"])
 
 
 def test_sync_failure_reports_readable_error(monkeypatch):
@@ -213,31 +222,32 @@ def test_sync_continues_past_a_game_that_fails_to_analyze(monkeypatch):
         assert payload["skipped_games"] == 2
 
 
-def test_stale_sync_job_does_not_block_a_new_sync(monkeypatch):
+def test_interrupted_sync_job_is_resumed_not_replaced(monkeypatch):
     async def empty_history(_platform: str, _username: str, _max_games: int) -> str:
         return ""
 
     monkeypatch.setattr("chess_coach_agent.adaptive_api.fetch_platform_pgn", empty_history)
-    with TestClient(app) as client:
-        with session_scope() as session:
-            player = get_or_create_player(session, "chess.com", "stale-sync-player")
-            stale = SyncJobRow(
-                player_id=player.id,
-                platform="chess.com",
-                username="stale-sync-player",
-                status="analyzing",
-                updated_at=datetime.now(UTC) - timedelta(hours=1),
-            )
-            session.add(stale)
-            session.flush()
-            stale_id = stale.id
+    with session_scope() as session:
+        player = get_or_create_player(session, "chess.com", "stale-sync-player")
+        stale = SyncJobRow(
+            player_id=player.id,
+            platform="chess.com",
+            username="stale-sync-player",
+            status="analyzing",
+            worker_id="dead-worker",
+            attempts=1,
+            heartbeat_at=datetime.now(UTC) - timedelta(hours=1),
+        )
+        session.add(stale)
+        session.flush()
+        stale_id = stale.id
 
-        payload = _run_sync(client, "stale-sync-player")
-        assert payload["id"] != stale_id
-        assert payload["status"] == "complete"
-        interrupted = client.get(f"/api/games/sync/{stale_id}").json()
-        assert interrupted["status"] == "failed"
-        assert "interrupted" in interrupted["error"]
+    with TestClient(app) as client:
+        started = client.post(
+            "/api/games/sync", json={"platform": "chess.com", "username": "stale-sync-player"}
+        )
+        assert started.json()["id"] == stale_id
+        assert _finished_job(client, stale_id)["status"] == "complete"
 
 
 def test_pasted_pgn_without_games_is_rejected():

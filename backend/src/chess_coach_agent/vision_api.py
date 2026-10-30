@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from email import policy
 from email.parser import BytesParser
 
 from fastapi import APIRouter, HTTPException, Request
 
+from .accounts import Viewer
+from .coach_limits import QuotaCharge, limit_reached
 from .monitoring import log_event
 from .vision import (
     ALLOWED_MEDIA_TYPES,
@@ -45,7 +48,7 @@ def _multipart_image(content_type: str, body: bytes) -> bytes:
 
 
 @router.post("/fen", response_model=VisionResult)
-async def image_to_fen(request: Request) -> VisionResult:
+async def image_to_fen(request: Request, user_id: Viewer) -> VisionResult:
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_IMAGE_BYTES + 64_000:
         raise HTTPException(413, "The image is larger than 5 MB.")
@@ -60,18 +63,27 @@ async def image_to_fen(request: Request) -> VisionResult:
     if media_type not in ALLOWED_MEDIA_TYPES:
         raise HTTPException(415, "Use a PNG, JPEG or WebP image.")
 
+    charge = QuotaCharge(request, user_id, "vision")
+    if not await asyncio.to_thread(charge.take):
+        raise limit_reached(charge.scope)
+
     started = time.perf_counter()
     try:
         result = await read_board_image(image, media_type)
     except VisionUnavailable as exc:
+        await asyncio.to_thread(charge.refund)
         raise HTTPException(503, "Board recognition needs OPENROUTER_API_KEY on the server.") from exc
     except TimeoutError as exc:
+        await asyncio.to_thread(charge.refund)
         log_event("vision_fen_failed", {"error": "timeout", "bytes": len(image)})
         raise HTTPException(504, "Reading the board took too long. Try a tighter crop.") from exc
     except ValueError as exc:
+        # The model did answer, and any photo can trigger this. It stays counted, or uploading
+        # non-boards would be unlimited.
         log_event("vision_fen_failed", {"error": str(exc)[:300], "bytes": len(image)})
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
+        await asyncio.to_thread(charge.refund)
         reason = f"{type(exc).__name__}: {exc}"[:300]
         log_event("vision_fen_failed", {"error": reason, "bytes": len(image)})
         raise HTTPException(502, "The vision model could not read this image.") from exc

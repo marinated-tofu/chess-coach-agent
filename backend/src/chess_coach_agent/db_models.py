@@ -94,12 +94,17 @@ class UserPlayerRow(Base):
 
 
 class CoachUsageRow(Base):
-    """Coach questions asked per UTC day. Subject is "user:<id>" or "anon:<hash of address>"."""
+    """Uses of a model-backed feature per UTC day, one row per feature.
+
+    Subject is "user:<id>" or "anon:<hash of address>". The table and the `questions` column are
+    named after the coach, which came first; see coach_limits.py for the other features.
+    """
 
     __tablename__ = "coach_usage"
 
     subject: Mapped[str] = mapped_column(String(64), primary_key=True)
     day: Mapped[date] = mapped_column(Date, primary_key=True)
+    feature: Mapped[str] = mapped_column(String(20), primary_key=True, server_default="coach")
     questions: Mapped[int] = mapped_column(Integer, default=0)
 
 
@@ -300,6 +305,8 @@ class StreamEventRow(Base):
 
 
 class SyncJobRow(Base):
+    """A game sync and its place in the durable queue (see sync_queue.py)."""
+
     __tablename__ = "sync_jobs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
@@ -311,6 +318,11 @@ class SyncJobRow(Base):
     analyzed_games: Mapped[int] = mapped_column(Integer, default=0)
     skipped_games: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str] = mapped_column(Text, default="")
+    max_games: Mapped[int] = mapped_column(Integer, default=2000, server_default="2000")
+    # Which worker holds the job, how many times it was claimed, and when it last proved alive.
+    worker_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

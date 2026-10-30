@@ -10,6 +10,7 @@ OpenTofu config for running the app on Google Cloud instead of Render.
 | Images | Artifact Registry | Keeps the 5 newest images and deletes anything older than 30 days. |
 | Deploys | GitHub Actions + Workload Identity Federation | No service account keys. Only `marinated-tofu/chess-coach-agent` can deploy. |
 | Spending cap | Billing budget + kill switch | Emails at 50%, 90% and 100%. At 100% a Cloud Function detaches billing, which stops everything. |
+| Alerts | Cloud Monitoring | An uptime check on `/api/health/ready`, and alerts on it and on the 5xx rate. They email `budget_alert_emails`; with that list empty they only show in the console. |
 
 The coach still calls Claude through OpenRouter. Moving it to Vertex AI is a separate change.
 
@@ -22,7 +23,15 @@ Estimates from list prices; check them in the [pricing calculator](https://cloud
 | Cloud SQL `db-f1-micro` + 10 GB SSD + backups | about $10–12 |
 | Cloud Run, scale to zero, light traffic | $0–10 |
 | Cloud Run with `min_instances = 1` | add about $30–45 |
+| Cloud Run with the uptime check on | about $50–55 in total; see below |
 | Secret Manager, Artifact Registry, Pub/Sub, function | under $1 |
+
+The service keeps CPU allocated so the sync worker can run, which bills an instance for as long as
+it stays up, idle or not. Three regions probing every 15 minutes means a request about every 5
+minutes, and an idle instance can stay up for 15, so the uptime check will likely keep one running
+all month. With Cloud SQL that is about $65, over the default `monthly_budget_usd` of 50, and the
+kill switch would then detach billing. Before applying, raise the budget or set
+`enable_uptime_check = false`.
 
 ## First deploy
 

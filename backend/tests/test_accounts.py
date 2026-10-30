@@ -18,7 +18,7 @@ from chess_coach_agent import account_api, adaptive_api, coach_limits, coach_too
 from chess_coach_agent.accounts import link_player, sign_in_user
 from chess_coach_agent.api import app
 from chess_coach_agent.auth import SESSION_COOKIE, chesscom_code, sign
-from chess_coach_agent.coach_limits import QuotaScope, coach_quota, take_question
+from chess_coach_agent.coach_limits import QuotaScope, coach_quota, take_quota
 from chess_coach_agent.db import session_scope
 from chess_coach_agent.db_models import (
     AuthIdentityRow,
@@ -571,7 +571,7 @@ def test_parallel_questions_cannot_pass_the_limit():
 
     def ask(_index: int) -> bool:
         with session_scope() as session:
-            return take_question(session, scope)
+            return take_quota(session, scope)
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(ask, range(40)))

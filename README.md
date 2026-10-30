@@ -247,7 +247,10 @@ Copy `.env.example` to `.env` at the repo root. Every variable is optional.
 | `LICHESS_CLIENT_ID` | `chess-coach-agent` | Name shown on the Lichess consent screen |
 | `PUBLIC_BASE_URL` | derived from the request | Origin used for the OAuth redirect URI |
 | `COACH_DAILY_LIMIT_ANONYMOUS`, `COACH_DAILY_LIMIT_FREE`, `COACH_DAILY_LIMIT_PAID` | `5`, `20`, `200` | Coach questions per UTC day. Anonymous visitors are counted per address |
+| `PRACTICE_DAILY_LIMIT_*`, `STUDY_PLAN_DAILY_LIMIT_*`, `VISION_DAILY_LIMIT_*` (`_ANONYMOUS`, `_FREE`, `_PAID`) | `3, 10, 100`; `2, 5, 20`; `3, 10, 100` | Model-backed uses per UTC day, each counted apart. Past the limit, practice and the study plan work without the model; vision returns 429 |
 | `TRUSTED_PROXY_HOPS` | `0` | How many proxies in front of the app append to `X-Forwarded-For`. Set it behind a proxy, or all anonymous visitors share one limit |
+| `SYNC_WORKER_ENABLED` | `true` | Run the game sync worker inside the app process. If `false`, run `python -m chess_coach_agent.sync_queue` separately |
+| `SYNC_WORKER_SLOTS` | `2` | Game syncs one process runs at the same time |
 | `MONITORING_LOG_PATH` | `backend/data/logs/events.jsonl` | JSONL event log |
 | `ENABLE_LOCAL_EMBEDDINGS` | `false` | Compute FastEmbed vectors for vector/hybrid retrieval |
 | `RETRIEVAL_STRATEGY` | from benchmark (`bm25`) | Force `bm25` or `hybrid` |

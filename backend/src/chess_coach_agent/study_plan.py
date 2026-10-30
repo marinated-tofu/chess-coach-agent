@@ -729,7 +729,8 @@ def verify_rationale(text: str, facts: dict[str, Any]) -> bool:
     return all(float(found) in allowed for found in quoted)
 
 
-async def write_rationale(facts: dict[str, Any]) -> str | None:
+async def write_rationale(facts: dict[str, Any]) -> tuple[str | None, bool]:
+    """The verified note, or None, and whether the model answered at all."""
     system = (
         "You write a short note explaining a chess player's weekly study plan. "
         'Return JSON only: {"rationale": "..."}. Two sentences at most, plain text. '
@@ -740,13 +741,13 @@ async def write_rationale(facts: dict[str, Any]) -> str | None:
         system, f"Facts: {json.dumps(facts)}", temperature=0.2
     )
     if not used:
-        return None
+        return None, False
     start, end = raw.find("{"), raw.rfind("}")
     if start < 0 or end < start:
-        return None
+        return None, True
     try:
         data = json.loads(raw[start : end + 1])
     except json.JSONDecodeError:
-        return None
+        return None, True
     text = str(data.get("rationale") or "").strip() if isinstance(data, dict) else ""
-    return text if verify_rationale(text, facts) else None
+    return (text if verify_rationale(text, facts) else None), True
