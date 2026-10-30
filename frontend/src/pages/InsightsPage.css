@@ -279,6 +279,24 @@
 .insights-table tbody th { font-weight: 600; }
 .insights-table tbody tr:last-child > * { border-bottom: 0; }
 
+.tactic-table { overflow-x: auto; }
+
+.tactic-misses a {
+  margin-left: 10px;
+  color: var(--green-600);
+  font-weight: 600;
+}
+
+.tactic-misses a:first-child { margin-left: 0; }
+
+.tactic-practice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--green-600);
+  font-weight: 600;
+}
+
 .insights-time-link {
   display: inline-flex;
   align-items: center;
@@ -430,6 +448,31 @@
   .insights-table th,
   .insights-table td { padding: 8px 5px; font-size: 13px; }
   .insights-table.wide { display: block; overflow-x: auto; }
+
+  /* Misses and practice links drop to a second line so they never scroll out of view. */
+  .tactic-table,
+  .tactic-table .insights-table.wide { overflow-x: visible; }
+  .tactic-table thead,
+  .tactic-table tbody { display: block; }
+  .tactic-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, 0.8fr)) minmax(0, 0.9fr) minmax(0, 1.2fr);
+    border-bottom: 1px solid var(--insights-line);
+  }
+  .tactic-table tbody tr:last-child { border-bottom: 0; }
+  .tactic-table tr > * { border-bottom: 0; }
+  .tactic-table tr > :nth-child(5) { padding-right: 0; padding-left: 0; }
+  .tactic-table thead th:nth-child(n + 6) { display: none; }
+  .tactic-table tbody td.tactic-misses {
+    grid-column: 1 / 4;
+    padding-top: 0;
+    padding-left: 0;
+    text-align: left;
+  }
+  .tactic-table tbody td:last-child {
+    grid-column: 4 / 6;
+    padding-top: 0;
+  }
 }
 
 .leak-examples {

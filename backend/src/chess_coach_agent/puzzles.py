@@ -216,9 +216,11 @@ def filter_puzzles(
     min_rating: int | None = None,
     max_rating: int | None = None,
     puzzles: Iterable[Puzzle] | None = None,
+    tag: str | None = None,
 ) -> list[Puzzle]:
     """Puzzles for ``theme`` (None or unknown means every theme) within the rating range,
-    easiest first. Unlike ``select_puzzles`` the range is strict: it never widens.
+    easiest first. Unlike ``select_puzzles`` the range is strict: it never widens. ``tag``
+    narrows to one Lichess tag, such as fork or mateIn2.
     """
     wanted = normalize_theme(theme)
     pool = puzzles if puzzles is not None else _load_default()
@@ -229,6 +231,7 @@ def filter_puzzles(
             if (wanted is None or item.theme == wanted)
             and (min_rating is None or item.rating >= min_rating)
             and (max_rating is None or item.rating <= max_rating)
+            and (tag is None or tag in item.tags)
         ),
         key=lambda item: (item.rating, item.id),
     )

@@ -23,6 +23,7 @@ now has a daily limit so the product can be sold.
 | Accounts with private data | Shipped | `accounts.py`, `/account`. Lichess sign-in only, for now. |
 | Per-user AI limits | Shipped | Coach: anonymous 5, free 20, paid 200 a day. Practice, plan notes and vision have their own limits. |
 | Durable sync queue, health checks | Shipped | `sync_queue.py`, `/api/health/ready` |
+| Tactics found and missed | Shipped | `tactics.py`, on Insights. Forks, pins, skewers, mate threats and mates, from stored engine data. Covers fewer chances than Chess.com may on purpose: each one must be proved. |
 
 The other 24 shipped rows were already in place before this work.
 
@@ -33,7 +34,6 @@ The other 24 shipped rows were already in place before this work.
 | Peer benchmarks | Partial, on purpose. Lichess players get a live percentile. Comparisons between users stay hidden until a band has 30 other players. Chess.com percentiles have no public source. See [peer-benchmarks.md](peer-benchmarks.md). |
 | Live checks | Lichess sign-in, a successful Chess.com link and the real coach model were not run in the combined walkthrough. |
 | Row locking on Postgres | CI runs the migrations and tests on Postgres; the concurrent queue claim has only been run on SQLite. |
-| Tactics found and missed | Chess.com's Diamond Insights reports these. Not compared with ours yet. |
 | Payments | Not built. Needs your choice of provider. `plan` exists, but nothing can change it yet. |
 | Google Cloud | Written in `infra/gcp`, not applied. Billing is closed. |
 

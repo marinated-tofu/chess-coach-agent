@@ -31,7 +31,17 @@ const RATINGS = Array.from(
 const REPLY_DELAY_MS = 350;
 const WRONG_SQUARE = 'rgba(180, 38, 46, 0.42)';
 
-export type PuzzleSearch = { theme?: string; min?: number; max?: number; page?: number };
+export type PuzzleSearch = { theme?: string; tag?: string; min?: number; max?: number; page?: number };
+
+/** Lichess tags that Insights links to. Anything else is ignored, not shown as a raw tag. */
+const TAG_LABELS: Record<string, string> = {
+  fork: 'Forks',
+  pin: 'Pins',
+  skewer: 'Skewers',
+  mate: 'Mates',
+  mateIn1: 'Mate in 1',
+  mateIn2: 'Mate in 2'
+};
 
 function ratingParam(value: unknown): number | undefined {
   const number = Number(value);
@@ -42,6 +52,7 @@ export function parsePuzzleSearch(search: Record<string, unknown>): PuzzleSearch
   const page = Number(search.page);
   return {
     ...(typeof search.theme === 'string' && search.theme ? { theme: search.theme } : {}),
+    ...(typeof search.tag === 'string' && TAG_LABELS[search.tag] ? { tag: search.tag } : {}),
     ...(ratingParam(search.min) != null ? { min: ratingParam(search.min) } : {}),
     ...(ratingParam(search.max) != null ? { max: ratingParam(search.max) } : {}),
     ...(Number.isInteger(page) && page > 0 ? { page } : {})
@@ -249,21 +260,26 @@ function Solver({ puzzle, onNext, hasNext, privatePlayer }: {
 export function PuzzlesPage({ search }: { search: PuzzleSearch }) {
   const { player, platform } = useWorkspace();
   const navigate = useNavigate();
-  const { theme, min, max, page = 1 } = search;
+  const { theme, tag, min, max, page = 1 } = search;
   const offset = (page - 1) * PAGE_SIZE;
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const catalog = useQuery({ queryKey: ['puzzle-catalog'], queryFn: getPuzzleCatalog, staleTime: Infinity });
   const username = player.trim() || undefined;
   const list = useQuery({
-    queryKey: ['puzzles', theme, min, max, page, username, platform],
-    queryFn: () => getPuzzles({ theme, minRating: min, maxRating: max }, offset, PAGE_SIZE, { username, platform }),
+    queryKey: ['puzzles', theme, tag, min, max, page, username, platform],
+    queryFn: () => getPuzzles({ theme, tag, minRating: min, maxRating: max }, offset, PAGE_SIZE, { username, platform }),
     placeholderData: keepPreviousData
   });
 
   function setSearch(next: PuzzleSearch) {
     setSelectedId(null);
-    void navigate({ to: '/puzzles', search: next, replace: true });
+    void navigate({ to: '/puzzles', search: { ...next, tag }, replace: true });
+  }
+
+  function clearTag() {
+    setSelectedId(null);
+    void navigate({ to: '/puzzles', search: { theme, min, max }, replace: true });
   }
 
   const puzzles = list.data?.puzzles ?? [];
@@ -314,6 +330,11 @@ export function PuzzlesPage({ search }: { search: PuzzleSearch }) {
             </button>
           ))}
         </div>
+        {tag && (
+          <button className="puzzle-tag" type="button" onClick={clearTag} aria-label={`Stop showing only ${TAG_LABELS[tag]}`}>
+            {TAG_LABELS[tag]} <X size={14} aria-hidden="true" />
+          </button>
+        )}
         <div className="puzzle-range">
           <label>
             From

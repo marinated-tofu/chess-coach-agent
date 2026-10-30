@@ -34,6 +34,8 @@ export interface PuzzlePage {
 
 export interface PuzzleFilters {
   theme?: string;
+  /** One Lichess tag, such as fork or mateIn2. */
+  tag?: string;
   minRating?: number;
   maxRating?: number;
 }
@@ -77,6 +79,7 @@ export async function getPuzzles(
 ): Promise<PuzzlePage> {
   const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   if (filters.theme) params.set('theme', filters.theme);
+  if (filters.tag) params.set('tag', filters.tag);
   if (filters.minRating != null) params.set('min_rating', String(filters.minRating));
   if (filters.maxRating != null) params.set('max_rating', String(filters.maxRating));
   const library = `/api/puzzles?${params}`;

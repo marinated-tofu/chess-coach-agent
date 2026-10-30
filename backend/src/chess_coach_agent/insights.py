@@ -6,6 +6,7 @@ objects (see openings_api.py for the same approach):
 * ``GameRow.metadata_json["moves"]`` holds every ply. Games analyzed with the current
   pipeline also carry per-move ``win_pct`` / ``accuracy`` / ``win_pct_loss`` and, when the
   PGN had them, clock fields. Older games only have SAN/FEN.
+* Tactics found and missed come from stored engine moves and python-chess; see tactics.py.
 * ``CriticalMomentRow`` exists for every analyzed game (old and new). ``severity`` is the
   Win% the player gave up, ``phase`` comes from ``phase_for_board`` on the position before
   the move.
@@ -44,6 +45,17 @@ from sqlalchemy.orm import Session
 from .classification import BLUNDER_LOSS, INACCURACY_LOSS, MISTAKE_LOSS, game_accuracy
 from .db_models import CriticalMomentRow, GameRow, PlayerRow
 from .pgn import parse_time_control
+from .tactics import (
+    MAX_EXAMPLES,
+    MIN_CHANCES,
+    MOTIFS,
+    Chance,
+    TacticExample,
+    TacticRow,
+    TacticsSection,
+    cached_game_chances,
+    has_stored_evals,
+)
 
 Phase = Literal["opening", "middlegame", "endgame"]
 TimeCategory = Literal["bullet", "blitz", "rapid", "daily"]
@@ -263,6 +275,7 @@ class InsightsResponse(BaseModel):
     colors: ColorSection
     conversion: ConversionSection
     schedule: ScheduleSection
+    tactics: TacticsSection = Field(default_factory=TacticsSection)
 
 
 # --------------------------------------------------------------------------- helpers
@@ -375,6 +388,7 @@ class _Moment:
 @dataclass
 class _Game:
     row_id: str
+    external_id: str
     color: str
     result: str
     time_control: str
@@ -390,6 +404,7 @@ def _load_games(session: Session, player_id: str, last: int) -> list[_Game]:
     rows = session.execute(
         select(
             GameRow.id,
+            GameRow.external_game_id,
             GameRow.player_color,
             GameRow.player_result,
             GameRow.time_control,
@@ -402,7 +417,7 @@ def _load_games(session: Session, player_id: str, last: int) -> list[_Game]:
         .limit(last)
     ).all()
     games: dict[str, _Game] = {}
-    for row_id, color, result, time_control, elo, stored, started_at in rows:
+    for row_id, external_id, color, result, time_control, elo, stored, started_at in rows:
         if color not in ("white", "black") or result not in ("win", "draw", "loss"):
             continue
         stored = stored or {}
@@ -410,6 +425,7 @@ def _load_games(session: Session, player_id: str, last: int) -> list[_Game]:
         termination = meta.get("termination")
         games[row_id] = _Game(
             row_id=row_id,
+            external_id=external_id,
             color=color,
             result=result,
             time_control=time_control or "",
@@ -493,6 +509,60 @@ def build_insights(
         colors=colors,
         conversion=conversion,
         schedule=_schedule_section(games, accuracy_by_game, timezone),
+        tactics=_tactics_section(games),
+    )
+
+
+def _tactic_example(game: _Game, chance: Chance) -> TacticExample:
+    return TacticExample(
+        game_id=game.external_id,
+        ply=chance.ply,
+        move_number=chance.move_number,
+        color=chance.color,  # type: ignore[arg-type]
+        played_san=chance.played_san,
+        best_san=chance.best_san,
+        fen=chance.fen,
+    )
+
+
+def _tactics_section(games: list[_Game]) -> TacticsSection:
+    """Games arrive newest first, so each row's examples are its latest misses."""
+    scanned = [g for g in games if has_stored_evals(g.moves)]
+    found: Counter[str] = Counter()
+    missed: Counter[str] = Counter()
+    examples: dict[str, list[TacticExample]] = defaultdict(list)
+    for game in scanned:
+        for chance in cached_game_chances(game.row_id, game.moves, game.color):
+            if chance.found:
+                found[chance.motif] += 1
+                continue
+            missed[chance.motif] += 1
+            if len(examples[chance.motif]) < MAX_EXAMPLES:
+                examples[chance.motif].append(_tactic_example(game, chance))
+    rows = []
+    for motif, label, tag in MOTIFS:
+        chances = found[motif] + missed[motif]
+        row = TacticRow(
+            motif=motif,
+            label=label,
+            found=found[motif],
+            missed=missed[motif],
+            chances=chances,
+            low_sample=chances < MIN_CHANCES,
+            practice_tag=tag,
+            examples=examples[motif],
+        )
+        if not row.low_sample:
+            rate = found[motif] / chances
+            row.found_pct = round(rate * 100, 1)
+            row.found_low_pct, row.found_high_pct = wilson_interval(rate, chances)
+        rows.append(row)
+    return TacticsSection(
+        sample_size=len(scanned),
+        games_without_evals=len(games) - len(scanned),
+        found=sum(found.values()),
+        missed=sum(missed.values()),
+        rows=rows,
     )
 
 
