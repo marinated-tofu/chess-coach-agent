@@ -55,6 +55,7 @@ from .insights import (
     _is_players_ply,
     build_insights,
 )
+from .models import LimitNotice
 from .openrouter_client import complete_with_openrouter
 from .puzzles import normalize_theme
 from .repertoire import _due_reviews, count_due
@@ -137,6 +138,7 @@ class StudyPlanResponse(BaseModel):
     known: bool = False
     plan: PlanView | None = None
     last_plan: PastPlan | None = None
+    limit_notice: LimitNotice | None = None  # only on the POST that lost the note to the limit
 
 
 # --------------------------------------------------------------------------- inputs

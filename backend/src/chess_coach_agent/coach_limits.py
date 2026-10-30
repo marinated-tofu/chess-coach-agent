@@ -6,7 +6,7 @@ Each feature has its own counter and limit: the coach, practice agent, study pla
 board reading cost different amounts and are used at different rates, so a day of practice should
 not use up the coach. A feature takes a `QuotaCharge` right before calling the model and hands it
 back if no answer came. At the limit the coach and vision return `limit_reached` (a 429); practice
-and the study plan carry on without the model.
+and the study plan carry on without the model and say so with a `limit_notice`.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from .auth import session_secret
 from .db import session_scope
 from .db_models import CoachUsageRow, UserRow
+from .models import LimitNotice
 
 DEFAULT_LIMITS = {
     "coach": {"anonymous": 5, "free": 20, "paid": 200},
@@ -47,6 +48,19 @@ USE_NAMES = {
     "practice": ("practice session", "practice sessions"),
     "study_plan": ("study plan note", "study plan notes"),
     "vision": ("board image read", "board image reads"),
+}
+# For features that carry on without the model: one use, many uses, what the player gets instead.
+FALLBACK_COPY = {
+    "practice": (
+        "coach-written practice session",
+        "coach-written practice sessions",
+        "so this one uses standard prompts. It works the same.",
+    ),
+    "study_plan": (
+        "study plan note",
+        "study plan notes",
+        "so this plan has no coach's note. Your tasks work the same.",
+    ),
 }
 
 
@@ -182,6 +196,26 @@ class QuotaCharge:
         self.taken = False
         with session_scope() as session:
             give_back_quota(session, self.scope)
+
+
+def limit_notice(scope: QuotaScope) -> LimitNotice:
+    """Tell the player a limit, not a fault, is why they got the version without the model."""
+    limit = scope.limit
+    one, many, fallback = FALLBACK_COPY[scope.feature]
+    if limit == 0:  # no reset to promise: the limit is still 0 tomorrow
+        if scope.plan == "anonymous":
+            message = (
+                f"{many.capitalize()} need an account, {fallback} "
+                "Sign in with Lichess to get them."
+            )
+        else:
+            message = f"{many.capitalize()} aren't available on your account today, {fallback}"
+    else:
+        uses = f"{limit} {one if limit == 1 else many}"
+        message = f"You've used your {uses} for today, {fallback} Your limit resets at midnight UTC."
+        if scope.plan == "anonymous":
+            message += " Sign in with Lichess to get more."
+    return LimitNotice(message=message, resets_at=resets_at())
 
 
 def limit_reached(scope: QuotaScope) -> HTTPException:

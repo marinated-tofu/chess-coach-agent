@@ -5,6 +5,8 @@ import { AlertCircle, ArrowRight, CalendarDays, Check, Clock, Loader2 } from 'lu
 import { createTrainingSession } from '../lib/api';
 import { createStudyPlan, getStudyPlan, studyPlanKey, type PlanTask, type StudyPlan } from '../lib/studyPlanApi';
 import type { Platform } from '../lib/types';
+import { planNoticeKey } from '../lib/limitNotice';
+import { LimitNoticeLine } from './LimitNoticeLine';
 import { Skeleton } from './Skeleton';
 import './StudyPlanCard.css';
 import { isAccessDenied } from '../lib/access';
@@ -92,7 +94,9 @@ function PlanWeek({ plan, player, platform }: { plan: StudyPlan; player: string;
     <>
       <div className="plan-summary">
         <p className="today-card-body">{plan.summary}</p>
-        {plan.rationale && <p className="plan-rationale">{plan.rationale}</p>}
+        {plan.rationale
+          ? <p className="plan-rationale">{plan.rationale}</p>
+          : <LimitNoticeLine noticeKey={planNoticeKey(plan.id)} />}
       </div>
       <div className="plan-meter" role="img" aria-label={`${plan.done_tasks} of ${plan.total_tasks} tasks done`}>
         <div className="plan-meter-track"><span style={{ transform: `scaleX(${share / 100})` }} /></div>

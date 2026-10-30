@@ -1,4 +1,5 @@
 import { throwIfDenied } from './access';
+import { practiceNoticeKey, rememberLimitNotice } from './limitNotice';
 import type {
   AnalyzeResponse,
   CoachAskResponse,
@@ -88,7 +89,9 @@ export async function createTrainingSession(
   });
   await throwIfDenied(response);
   if (!response.ok) throw new Error(await errorMessage(response, 'Could not build training session'));
-  return response.json();
+  const session: TrainingSession = await response.json();
+  rememberLimitNotice(practiceNoticeKey(session.id), session.limit_notice);
+  return session;
 }
 
 /** A session of timed positions from the player's own games (practice mode "time"). */

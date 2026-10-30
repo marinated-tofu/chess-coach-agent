@@ -103,3 +103,7 @@
 
   .practice-queue-preview { max-width: 200px; justify-self: center; }
 }
+
+.practice-limit-notice {
+  margin: -8px 0 16px;
+}

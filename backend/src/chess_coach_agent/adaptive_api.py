@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy import select
 
 from .accounts import Viewer, can_access, public_profile, require_access, require_player
-from .coach_limits import QuotaCharge, limit_reached
+from .coach_limits import QuotaCharge, limit_notice, limit_reached
 from .db import session_scope
 from .agent import ChessCoachAgent
 from .analysis import ANALYSIS_VERSION
@@ -335,6 +335,8 @@ async def create_training_session(
     # After the session above has committed: with SQLite the refund would wait on its writes.
     if not result.used_llm:
         await asyncio.to_thread(charge.refund)
+    if result.llm_limited:
+        view.limit_notice = limit_notice(charge.scope)
     return view
 
 

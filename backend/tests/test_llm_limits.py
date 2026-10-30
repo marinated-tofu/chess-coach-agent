@@ -166,6 +166,47 @@ def test_practice_at_the_limit_builds_a_session_without_the_model(monkeypatch, l
     assert len(second.json()["positions"]) == len(first.json()["positions"])
     assert llm_calls == []
     assert _used(user_id, "practice") == 1
+    assert first.json()["limit_notice"] is None
+    notice = second.json()["limit_notice"]
+    assert "1 coach-written practice session for today" in notice["message"]
+    assert "works the same" in notice["message"]
+    assert "resets at midnight UTC" in notice["message"]
+    assert "Sign in" not in notice["message"]
+    assert notice["resets_at"]
+
+
+def test_anonymous_practice_notice_has_the_reset_and_a_sign_in_hint(monkeypatch, llm_calls):
+    monkeypatch.setenv("PRACTICE_DAILY_LIMIT_ANONYMOUS", "1")
+    client = TestClient(app, raise_server_exceptions=False, client=(uuid4().hex, 50000))
+    assert _practice(client).json()["limit_notice"] is None
+    message = _practice(client).json()["limit_notice"]["message"]
+    assert "resets at midnight UTC" in message
+    assert message.endswith("Sign in with Lichess to get more.")
+
+
+def test_a_limit_of_zero_promises_no_reset(monkeypatch, llm_calls):
+    monkeypatch.setenv("PRACTICE_DAILY_LIMIT_ANONYMOUS", "0")
+    monkeypatch.setenv("PRACTICE_DAILY_LIMIT_FREE", "0")
+    client = TestClient(app, raise_server_exceptions=False, client=(uuid4().hex, 50000))
+    anonymous = _practice(client).json()["limit_notice"]["message"]
+    assert anonymous.startswith("Coach-written practice sessions need an account")
+    assert anonymous.endswith("Sign in with Lichess to get them.")
+    free = _practice(_client(_user())).json()["limit_notice"]["message"]
+    assert "aren't available on your account today" in free
+    assert "resets" not in anonymous + free
+
+
+def test_practice_after_a_model_failure_stays_quiet(monkeypatch, llm_calls):
+    monkeypatch.setattr(quiz_copy, "complete_with_openrouter_sync", lambda *_a, **_k: ("", False))
+    assert _practice(_client(_user())).json()["limit_notice"] is None
+
+
+def test_reading_a_stored_session_repeats_no_notice(monkeypatch, llm_calls):
+    monkeypatch.setenv("PRACTICE_DAILY_LIMIT_FREE", "0")
+    client = _client(_user())
+    created = _practice(client).json()
+    assert created["limit_notice"]
+    assert client.get(f"/api/training/sessions/{created['id']}").json()["limit_notice"] is None
 
 
 def test_practice_refunds_when_the_model_never_answered(monkeypatch, llm_calls):
@@ -189,7 +230,9 @@ def test_practice_without_a_key_uses_no_quota(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setenv("PRACTICE_DAILY_LIMIT_FREE", "0")
     user_id = _user()
-    assert _practice(_client(user_id)).status_code == 200
+    response = _practice(_client(user_id))
+    assert response.status_code == 200
+    assert response.json()["limit_notice"] is None
     assert _used(user_id, "practice") == 0
 
 
@@ -221,6 +264,29 @@ def test_plan_at_the_limit_is_built_without_a_note(monkeypatch):
     assert plan["rationale"] is None
     assert plan["summary"]
     assert calls == []
+    message = response.json()["limit_notice"]["message"]
+    assert "aren't available on your account today" in message
+    assert "Your tasks work the same." in message
+    # The notice belongs to this build; a later read of the plan does not repeat it.
+    assert client.get(url).json()["limit_notice"] is None
+
+
+def test_plan_notice_counts_the_uses_and_says_when_the_limit_resets(monkeypatch):
+    monkeypatch.setenv("STUDY_PLAN_DAILY_LIMIT_FREE", "1")
+    _user_id, client, url, _calls = _plan(monkeypatch, (None, True))
+    assert client.post(url, json={}).json()["limit_notice"] is None
+    message = client.post(url, json={}).json()["limit_notice"]["message"]
+    assert "1 study plan note for today" in message
+    assert "resets at midnight UTC" in message
+
+
+def test_anonymous_plan_notice_has_a_sign_in_hint(monkeypatch):
+    monkeypatch.setenv("STUDY_PLAN_DAILY_LIMIT_ANONYMOUS", "0")
+    _user_id, _signed_in, url, _calls = _plan(monkeypatch, ("A note.", True))
+    client = TestClient(app, raise_server_exceptions=False)
+    message = client.post(url, json={}).json()["limit_notice"]["message"]
+    assert message.startswith("Study plan notes need an account")
+    assert message.endswith("Sign in with Lichess to get them.")
 
 
 def test_plan_note_is_counted(monkeypatch):
@@ -231,8 +297,17 @@ def test_plan_note_is_counted(monkeypatch):
 
 def test_failed_plan_note_is_refunded(monkeypatch):
     user_id, client, url, _calls = _plan(monkeypatch, (None, False))
-    assert client.post(url, json={}).status_code == 200
+    response = client.post(url, json={})
+    assert response.status_code == 200
+    assert response.json()["limit_notice"] is None
     assert _used(user_id, "study_plan") == 0
+
+
+def test_plan_without_a_key_stays_quiet(monkeypatch):
+    monkeypatch.setenv("STUDY_PLAN_DAILY_LIMIT_FREE", "0")
+    _user_id, client, url, _calls = _plan(monkeypatch, ("A note.", True))
+    monkeypatch.delenv("OPENROUTER_API_KEY")
+    assert client.post(url, json={}).json()["limit_notice"] is None
 
 
 def test_rejected_plan_notes_stay_counted_so_retries_hit_the_limit(monkeypatch):

@@ -17,9 +17,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from .accounts import Viewer, require_access
-from .coach_limits import QuotaCharge
+from .coach_limits import QuotaCharge, limit_notice
 from .db import session_scope
 from .db_models import GameRow, StudyPlanRow
+from .models import LimitNotice
 from .monitoring import log_event
 from .openings_api import _find_player
 from .study_plan import (
@@ -67,8 +68,8 @@ def _build(platform: str, username: str, today: date) -> tuple[str, bool, dict[s
 
 async def _limited_rationale(
     facts: dict[str, Any], request: Request, user_id: str | None
-) -> tuple[str | None, bool]:
-    """The note, if the viewer has quota for one, and whether the limit stopped it.
+) -> tuple[str | None, LimitNotice | None]:
+    """The note, if the viewer has quota for one, or the notice saying the limit stopped it.
 
     The plan is already stored: a slow or failed LLM call, or the limit, only loses the note.
     A note the model wrote that failed verification stays counted. Those plans are asked again on
@@ -76,14 +77,14 @@ async def _limited_rationale(
     """
     charge = QuotaCharge(request, user_id, "study_plan")
     if not await asyncio.to_thread(charge.take):
-        return None, True
+        return None, limit_notice(charge.scope)
     answered = False
     try:
         rationale, answered = await write_rationale(facts)
     finally:
         if not answered:
             await asyncio.to_thread(charge.refund)
-    return rationale, False
+    return rationale, None
 
 
 @router.post("/{platform}/{username}", response_model=StudyPlanResponse)
@@ -97,12 +98,12 @@ async def post_study_plan(
         built = await asyncio.to_thread(_build, platform, username, today)
     except IntegrityError:  # a parallel request stored this week's plan first
         built = None
+    notice = None
     if built is not None:
         plan_id, needs_rationale, facts = built
         rationale = None
-        limited = False
         if needs_rationale and os.getenv("OPENROUTER_API_KEY"):
-            rationale, limited = await _limited_rationale(facts, request, user_id)
+            rationale, notice = await _limited_rationale(facts, request, user_id)
         if rationale:
             with session_scope() as session:
                 row = session.get(StudyPlanRow, plan_id)
@@ -114,12 +115,14 @@ async def post_study_plan(
                 "plan_id": plan_id,
                 "tasks": facts.get("tasks"),
                 "rationale": bool(rationale),
-                "llm_limited": limited,
+                "llm_limited": notice is not None,
             },
         )
     with session_scope() as session:
         player = _find_player(session, platform, username)
-        return study_plan_response(session, platform, username, player, today)
+        response = study_plan_response(session, platform, username, player, today)
+    response.limit_notice = notice
+    return response
 
 
 @router.post("/{platform}/{username}/game-retry")

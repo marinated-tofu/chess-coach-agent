@@ -1,3 +1,5 @@
+import type { LimitNotice } from './limitNotice';
+
 export type MoveClassification =
   | 'brilliant'
   | 'great'
@@ -165,6 +167,7 @@ export type TrainingSession = {
   difficulty: Difficulty;
   status: string;
   positions: TrainingPosition[];
+  limit_notice?: LimitNotice | null;
 };
 
 export type ProgressSummary = {

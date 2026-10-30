@@ -1,4 +1,5 @@
 import { throwIfDenied } from './access';
+import { planNoticeKey, rememberLimitNotice, type LimitNotice } from './limitNotice';
 import type { Platform } from './types';
 
 export type PlanTaskKind = 'due_review' | 'leak_practice' | 'game_review' | 'repertoire_review' | 'repertoire_build';
@@ -45,6 +46,7 @@ export interface StudyPlanResponse {
   known: boolean;
   plan: StudyPlan | null;
   last_plan: { start_date: string; end_date: string; done_tasks: number; total_tasks: number } | null;
+  limit_notice?: LimitNotice | null;
 }
 
 /** The player's calendar date; the plan's days follow it, not the server's UTC date. */
@@ -77,7 +79,9 @@ export async function createStudyPlan(username: string, platform: Platform): Pro
   });
   await throwIfDenied(response);
   if (!response.ok) throw new Error('Could not build your study plan');
-  return response.json();
+  const data: StudyPlanResponse = await response.json();
+  if (data.plan) rememberLimitNotice(planNoticeKey(data.plan.id), data.limit_notice);
+  return data;
 }
 
 /** Logs a finished retry on the review page. Progress only, so a failure is not shown. */

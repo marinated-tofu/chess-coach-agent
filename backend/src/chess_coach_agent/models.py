@@ -370,6 +370,13 @@ class TrainingPositionView(BaseModel):
     time_budget_seconds: int | None = None
 
 
+class LimitNotice(BaseModel):
+    """Set only when a daily limit stopped the model. No key or a model failure leaves it empty."""
+
+    message: str
+    resets_at: datetime
+
+
 class TrainingSessionView(BaseModel):
     id: str
     player_id: str
@@ -377,6 +384,7 @@ class TrainingSessionView(BaseModel):
     difficulty: Difficulty
     status: str
     positions: list[TrainingPositionView]
+    limit_notice: LimitNotice | None = None
 
 
 class QuizAttemptCreate(BaseModel):

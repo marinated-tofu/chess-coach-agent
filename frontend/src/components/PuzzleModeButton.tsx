@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Loader2, Puzzle } from 'lucide-react';
 import type { Platform, TrainingSession } from '../lib/types';
 import { errorMessage } from '../lib/api';
+import { practiceNoticeKey, rememberLimitNotice } from '../lib/limitNotice';
 
 type Props = {
   username: string;
@@ -33,7 +34,9 @@ export function PuzzleModeButton({ username, platform, theme, positionCount = 5,
         })
       });
       if (!response.ok) throw new Error(await errorMessage(response, 'Could not build a puzzle session'));
-      await onStarted(await response.json());
+      const session: TrainingSession = await response.json();
+      rememberLimitNotice(practiceNoticeKey(session.id), session.limit_notice);
+      await onStarted(session);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not build a puzzle session');
     } finally {

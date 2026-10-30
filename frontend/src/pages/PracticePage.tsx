@@ -5,6 +5,7 @@ import { AlertCircle, ArrowRight, CheckCircle2, FlipVertical2, Home, Loader2, Ro
 import { ARROW_COLORS, ChessBoard, type BoardArrow } from '../components/ChessBoard';
 import { CoachPanel } from '../components/CoachPanel';
 import { EmptyState } from '../components/EmptyState';
+import { LimitNoticeLine } from '../components/LimitNoticeLine';
 import { PageHeader } from '../components/PageHeader';
 import { PuzzleModeButton } from '../components/PuzzleModeButton';
 import { Skeleton } from '../components/Skeleton';
@@ -17,6 +18,7 @@ import {
   submitTrainingAttempt
 } from '../lib/api';
 import { parseMove, playMove, type BoardMove } from '../lib/chessRules';
+import { practiceNoticeKey } from '../lib/limitNotice';
 import { useCoachMarks } from '../lib/coachMarks';
 import type { EvaluationPanel } from '../lib/types';
 import { useWorkspace } from '../workspace/WorkspaceContext';
@@ -297,6 +299,7 @@ export function PracticePage({ sessionId, mode }: { sessionId?: string; mode?: '
     {budgetSeconds != null
       ? <header className="page-header"><div><span className="page-eyebrow">Time trainer · {index + 1} of {total}</span><h1>Position {index + 1}</h1><p>Position from your games</p></div></header>
       : <header className="page-header"><div><span className="page-eyebrow">Practice · {index + 1} of {total}</span><h1>{themeLabel(position.theme)}</h1><p>{themeLabel(position.difficulty)} · {position.source === 'puzzle' ? <span className="puzzle-badge">Puzzle{position.rating ? ` · ${position.rating}` : ''}</span> : 'Position from your games'}</p></div></header>}
+    {index === 0 && sessionId && <div className="practice-limit-notice"><LimitNoticeLine noticeKey={practiceNoticeKey(sessionId)} /></div>}
     <section className="practice-workspace">
       <div className="practice-board">
         {budgetSeconds != null && !evaluation && (
