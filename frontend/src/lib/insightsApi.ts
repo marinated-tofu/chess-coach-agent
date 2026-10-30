@@ -137,6 +137,55 @@ export interface InsightsResponse {
   };
 }
 
+export interface RatingPercentile {
+  perf: string;
+  rating: number;
+  percentile: number;
+  players: number;
+  players_as_of: string;
+  source_url: string;
+}
+
+export interface PeerMetric {
+  key: string;
+  label: string;
+  higher_is_better: boolean;
+  value: number;
+  peer_median: number;
+  better_than: number;
+  players: number;
+}
+
+export interface PeerCohort {
+  category: TimeCategory;
+  band_low: number;
+  band_high: number;
+  players: number;
+  games: number;
+  metrics: PeerMetric[];
+}
+
+export interface BenchmarksResponse {
+  platform: string;
+  username: string;
+  min_cohort_players: number;
+  rating_source: string;
+  rating_scale_note: string;
+  rating_percentiles: RatingPercentile[];
+  cohorts: PeerCohort[];
+}
+
+export async function getBenchmarks(
+  username: string,
+  platform: Platform | 'pgn'
+): Promise<BenchmarksResponse> {
+  const response = await fetch(
+    `/api/benchmarks/${encodeURIComponent(platform)}/${encodeURIComponent(username)}`
+  );
+  if (!response.ok) throw new Error('Could not load benchmarks');
+  return response.json();
+}
+
 export async function getInsights(
   username: string,
   platform: Platform | 'pgn',

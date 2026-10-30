@@ -25,6 +25,7 @@ from .endgames_api import router as endgames_router
 from .engine_api import router as engine_router
 from .bots_api import router as bots_router
 from .insights_api import router as insights_router
+from .benchmarks_api import router as benchmarks_router
 from .vision_api import router as vision_router
 from .auth_api import router as auth_router
 from .account_api import router as account_router
@@ -54,6 +55,7 @@ app.include_router(engine_router)
 app.include_router(endgames_router)
 app.include_router(bots_router)
 app.include_router(insights_router)
+app.include_router(benchmarks_router)
 app.include_router(vision_router)
 app.include_router(auth_router)
 app.include_router(account_router)

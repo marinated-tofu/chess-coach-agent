@@ -178,6 +178,19 @@
   text-wrap: pretty;
 }
 
+.insights-footnote a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.benchmark-cohort { margin-top: 18px; }
+
+.benchmark-cohort h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
 .insights-footnote {
   margin: 12px 0 0;
   color: var(--insights-muted);

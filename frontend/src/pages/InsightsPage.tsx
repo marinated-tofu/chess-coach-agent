@@ -15,7 +15,9 @@ import {
 } from 'recharts';
 import { createTrainingSession } from '../lib/api';
 import {
+  getBenchmarks,
   getInsights,
+  type BenchmarksResponse,
   type InsightsResponse,
   type Leak,
   type PhaseRow,
@@ -434,6 +436,93 @@ function ConversionSection({ data }: { data: InsightsResponse }) {
   );
 }
 
+const PERF_LABEL: Record<string, string> = {
+  ultraBullet: 'UltraBullet',
+  bullet: 'Bullet',
+  blitz: 'Blitz',
+  rapid: 'Rapid',
+  classical: 'Classical'
+};
+
+const SITE_LABEL: Record<string, string> = { 'chess.com': 'Chess.com', lichess: 'Lichess' };
+
+function PeerCohortTable({ cohort, platform, minPlayers }: {
+  cohort: BenchmarksResponse['cohorts'][number];
+  platform: string;
+  minPlayers: number;
+}) {
+  const site = SITE_LABEL[platform] ?? platform;
+  const control = cohort.category.charAt(0).toUpperCase() + cohort.category.slice(1);
+  return (
+    <div className="benchmark-cohort">
+      <h3>{control}, {site} rating {cohort.band_low}-{cohort.band_high}</h3>
+      <table className="insights-table wide">
+        <thead>
+          <tr><th>Metric</th><th>You</th><th>Peer median</th><th>Better than</th></tr>
+        </thead>
+        <tbody>
+          {cohort.metrics.map((metric) => (
+            <tr key={metric.key}>
+              <th scope="row">{metric.label}</th>
+              <td>{metric.value.toFixed(metric.key === 'blunders_per_game' ? 2 : 1)}</td>
+              <td>{metric.peer_median.toFixed(metric.key === 'blunders_per_game' ? 2 : 1)}</td>
+              <td>{count(metric.better_than)} of {count(metric.players)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="insights-footnote">
+        Source: analyzed games in this app, {count(cohort.players)} other {site} players and{' '}
+        {count(cohort.games)} games. Ties don't count as better. Shown only with at least {minPlayers} other players.
+      </p>
+    </div>
+  );
+}
+
+function BenchmarksSection({ player, platform }: { player: string; platform: InsightsResponse['platform'] }) {
+  const query = useQuery({
+    queryKey: ['benchmarks', platform, player],
+    queryFn: () => getBenchmarks(player, platform as 'chess.com' | 'lichess'),
+    enabled: player.trim().length > 0,
+    staleTime: 3_600_000,
+    retry: false
+  });
+  const data = query.data;
+  // Any failure, or nothing honest to show, leaves the page exactly as it was without this section.
+  if (!data || (!data.rating_percentiles.length && !data.cohorts.length)) return null;
+  return (
+    <section className="insights-section" aria-labelledby="benchmarks-title">
+      <header className="insights-section-head">
+        <h2 id="benchmarks-title">Compared with other players</h2>
+      </header>
+      {data.rating_percentiles.length > 0 && (
+        <>
+          <div className="insights-tiles two">
+            {data.rating_percentiles.map((row) => (
+              <div className="insights-tile" key={row.perf}>
+                <span>{PERF_LABEL[row.perf] ?? row.perf} rating on Lichess: {row.rating}</span>
+                <strong>{fmt(row.percentile, 1, '%')}</strong>
+                <small>of active players are rated below you, out of {count(row.players)}</small>
+              </div>
+            ))}
+          </div>
+          <p className="insights-footnote">
+            Source:{' '}
+            <a href={data.rating_percentiles[0].source_url} target="_blank" rel="noreferrer">
+              {data.rating_source}
+            </a>
+            . Percentile is live. Player counts cover one week, counted on {data.rating_percentiles[0].players_as_of}.{' '}
+            {data.rating_scale_note}
+          </p>
+        </>
+      )}
+      {data.cohorts.map((cohort) => (
+        <PeerCohortTable key={cohort.category} cohort={cohort} platform={data.platform} minPlayers={data.min_cohort_players} />
+      ))}
+    </section>
+  );
+}
+
 function browserTimezone() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -534,6 +623,7 @@ export function InsightsPage() {
             <ColorSection data={data} />
             {data.conversion.sample_size >= min && <ConversionSection data={data} />}
           </div>
+          <BenchmarksSection player={workspace.player} platform={data.platform} />
           {missing.length > 0 && (
             <section className="insights-missing">
               <p>
