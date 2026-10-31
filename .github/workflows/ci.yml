@@ -43,6 +43,7 @@ jobs:
           cd backend
           uv run alembic upgrade head
           uv run python -m chess_coach_agent.ingest_knowledge
+          uv run python scripts/check_postgres_queue.py
       - name: Frontend build
         run: |
           cd frontend
