@@ -566,6 +566,19 @@ def test_failed_answer_gives_the_question_back(monkeypatch):
     assert client.get("/api/auth/me").json()["coach_quota"]["used"] == 0
 
 
+def test_model_failure_fallback_gives_the_question_back(monkeypatch):
+    real = adaptive_api.ask_coach
+
+    async def fallback(*args, **kwargs):
+        response = await real(*args, **kwargs)
+        return response.model_copy(update={"fallback_reason": "TimeoutError: provider down"})
+
+    monkeypatch.setattr(adaptive_api, "ask_coach", fallback)
+    client = _client(_user())
+    assert client.post("/api/coach/ask", json=QUESTION).status_code == 200
+    assert client.get("/api/auth/me").json()["coach_quota"]["used"] == 0
+
+
 def test_parallel_questions_cannot_pass_the_limit():
     scope = QuotaScope(f"user:{uuid4().hex}", "free")
 

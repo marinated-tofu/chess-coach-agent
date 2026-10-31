@@ -456,6 +456,9 @@ async def ask_coach_route(
     except Exception:
         await asyncio.to_thread(charge.refund)
         raise
+    # ask_coach turns a model failure into the fallback answer, so the except above never sees it.
+    if not response.used_llm and response.fallback_reason != "no_api_key":
+        await asyncio.to_thread(charge.refund)
     log_event(
         "coach_answered",
         {
