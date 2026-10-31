@@ -275,8 +275,8 @@ function TimeSection({ data }: { data: InsightsResponse }) {
 }
 
 function OpponentSection({ data }: { data: InsightsResponse }) {
-  const rows = data.opponents.rows.filter((row) => row.games > 0);
-  const best = [...rows].sort((a, b) => (b.score_pct ?? 0) - (a.score_pct ?? 0))[0];
+  const rows = data.opponents.rows.filter((row) => row.games >= data.min_sample);
+  const best = rows.length > 1 ? [...rows].sort((a, b) => (b.score_pct ?? 0) - (a.score_pct ?? 0))[0] : undefined;
   return (
     <section className="insights-section">
       <SectionHead title="By opponent rating" n={data.opponents.sample_size} />
