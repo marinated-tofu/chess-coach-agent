@@ -34,7 +34,6 @@ the product needs.
 | --- | --- |
 | Peer benchmarks | Partial, on purpose. Lichess players get a live percentile. Comparisons between users stay hidden until a band has 30 other players. Chess.com percentiles have no public source. See [peer-benchmarks.md](peer-benchmarks.md). |
 | Live checks | Lichess sign-in and a successful Chess.com link have not been run. The real coach model was run locally on the combined code on 31 October 2026, with 4 engine tools on one game, and it declined to guess on a game with no data. Those answers drew no board arrows, and the deployed site has not been checked. |
-| Row locking on Postgres | CI runs the migrations and tests on Postgres; the concurrent queue claim has only been run on SQLite. |
 | Payments | Not built. Needs your choice of provider. `plan` exists, but nothing can change it yet. |
 | Google Cloud | Written in `infra/gcp`, not applied. Billing is closed. |
 
