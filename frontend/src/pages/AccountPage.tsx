@@ -84,6 +84,7 @@ export function AccountPage() {
 
 function QuotaLine({ quota }: { quota?: CoachQuota }) {
   if (!quota) return null;
+  if (quota.limit === 0) return <p className="account-hint">Coach questions aren't available on this plan.</p>;
   return (
     <p className="account-hint num">
       {quota.remaining.toLocaleString()} of {quota.limit.toLocaleString()} coach questions left today. The count resets at midnight UTC.

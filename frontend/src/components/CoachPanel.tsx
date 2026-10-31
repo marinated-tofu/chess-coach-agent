@@ -384,7 +384,9 @@ export function CoachPanel({
       {error && <p className="coach-error" role="alert">{error}</p>}
       {quota && quota.remaining <= LOW_QUOTA && !error && (
         <p className="coach-quota num">
-          {quota.remaining === 0
+          {quota.limit === 0
+            ? "Coach questions aren't available on this plan."
+            : quota.remaining === 0
             ? 'No coach questions left today.'
             : `${quota.remaining} coach ${quota.remaining === 1 ? 'question' : 'questions'} left today.`}
         </p>
